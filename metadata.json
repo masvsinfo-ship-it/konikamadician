@@ -1,0 +1,5 @@
+{
+  "name": "পাথর হিসাব ক্যালকুলেটর (Murubba Calculator)",
+  "description": "An easy-to-use tool for calculating stone volume and 'Murubba' units based on length, width, and height inputs, specifically designed for stone traders and construction projects.",
+  "requestFramePermissions": []
+}
