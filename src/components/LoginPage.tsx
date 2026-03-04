@@ -42,6 +42,13 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   }, []);
 
   const handleInstallClick = async () => {
+    // Check if app is already installed
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    if (isStandalone) {
+      alert('অ্যাপটি ইতিমধ্যেই আপনার ডিভাইসে ইন্সটল করা আছে।');
+      return;
+    }
+
     // Check if it's iOS
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     
@@ -51,14 +58,19 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
     }
 
     if (!deferredPrompt) {
-      alert('আপনার ব্রাউজারে "Add to Home Screen" বা "Install App" অপশনটি ব্যবহার করে অ্যাপটি ইন্সটল করুন।');
+      alert('ইন্সটল অপশনটি এখনও প্রস্তুত হয়নি। দয়া করে কয়েক সেকেন্ড অপেক্ষা করুন অথবা পেইজটি রিফ্রেশ করুন। ব্রাউজার নিশ্চিত হতে চায় যে আপনি এই সাইটটি ব্যবহার করছেন।');
       return;
     }
     
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } catch (err) {
+      console.error('Install prompt error:', err);
+      alert('ইন্সটল করার সময় একটি সমস্যা হয়েছে। দয়া করে ব্রাউজারের মেনু থেকে "Install App" বা "Add to Home Screen" অপশনটি ব্যবহার করুন।');
     }
   };
 

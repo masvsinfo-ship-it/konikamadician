@@ -28,19 +28,31 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, notificati
   const [isOnline, setIsOnline] = useState(true);
 
   const handleInstallClick = async () => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    if (isStandalone) {
+      alert('অ্যাপটি ইতিমধ্যেই আপনার ডিভাইসে ইন্সটল করা আছে।');
+      return;
+    }
+
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     if (isIOS) {
       alert('iOS ডিভাইসে ইন্সটল করতে:\n১. ব্রাউজারের নিচে "Share" আইকনে ক্লিক করুন।\n২. নিচে স্ক্রল করে "Add to Home Screen" এ ক্লিক করুন।');
       return;
     }
     if (!deferredPrompt) {
-      alert('আপনার ব্রাউজারে "Add to Home Screen" বা "Install App" অপশনটি ব্যবহার করে অ্যাপটি ইন্সটল করুন।');
+      alert('ইন্সটল অপশনটি এখনও প্রস্তুত হয়নি। দয়া করে কয়েক সেকেন্ড অপেক্ষা করুন অথবা পেইজটি রিফ্রেশ করুন।');
       return;
     }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
+    
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } catch (err) {
+      console.error('Install prompt error:', err);
+      alert('ইন্সটল করার সময় একটি সমস্যা হয়েছে।');
     }
   };
 

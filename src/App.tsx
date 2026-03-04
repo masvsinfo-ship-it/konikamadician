@@ -13,6 +13,14 @@ import { Analytics } from './components/Analytics';
 import { Transaction } from './types';
 import { Bell, X, BookOpen } from 'lucide-react';
 
+// Global to capture prompt if it fires before React mounts
+let capturedPrompt: any = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  capturedPrompt = e;
+  console.log('PWA Install prompt captured globally');
+});
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -22,13 +30,16 @@ export default function App() {
     return sessionStorage.getItem('is_authenticated') === 'true';
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(capturedPrompt);
 
   useEffect(() => {
+    if (capturedPrompt) {
+      setDeferredPrompt(capturedPrompt);
+    }
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      console.log('PWA Install prompt captured');
+      console.log('PWA Install prompt captured in React');
     };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
