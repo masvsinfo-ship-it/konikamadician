@@ -22,6 +22,18 @@ export default function App() {
     return sessionStorage.getItem('is_authenticated') === 'true';
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      console.log('PWA Install prompt captured');
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
   const {
     transactions,
     customers,
@@ -319,7 +331,7 @@ export default function App() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <LoginPage onLogin={handleLogin} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />;
   }
 
   const renderContent = () => {
@@ -408,6 +420,8 @@ export default function App() {
       notifications={notifications}
       onDismissNotification={handleDismissNotification}
       userProfile={userProfile}
+      deferredPrompt={deferredPrompt}
+      setDeferredPrompt={setDeferredPrompt}
     >
       {renderContent()}
     </Layout>

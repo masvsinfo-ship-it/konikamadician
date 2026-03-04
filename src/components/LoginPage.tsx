@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface LoginPageProps {
   onLogin: (data: any, loginId: string, pass: string, profile?: any) => void;
+  deferredPrompt: any;
+  setDeferredPrompt: (prompt: any) => void;
 }
 
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginPageProps) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
   const [loginId, setLoginId] = useState('');
@@ -19,7 +21,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [recoveredPassword, setRecoveredPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
   useEffect(() => {
@@ -35,13 +36,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     checkServer();
     const interval = setInterval(checkServer, 30000);
 
-    const handler = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
     return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
       clearInterval(interval);
     };
   }, []);

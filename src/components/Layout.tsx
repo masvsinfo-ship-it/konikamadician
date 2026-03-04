@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, BookOpen, Smartphone, Users, ListTodo, Settings as SettingsIcon, LogOut, Receipt, Menu, TrendingUp, Bell, X, User, CloudOff, Cloud } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Smartphone, Users, ListTodo, Settings as SettingsIcon, LogOut, Receipt, Menu, TrendingUp, Bell, X, User, CloudOff, Cloud, Download } from 'lucide-react';
 import { UserProfile } from '../types';
 
 export interface AppNotification {
@@ -18,12 +18,31 @@ interface LayoutProps {
   notifications: AppNotification[];
   onDismissNotification: (id: string) => void;
   userProfile: UserProfile | null;
+  deferredPrompt: any;
+  setDeferredPrompt: (prompt: any) => void;
 }
 
-export function Layout({ children, activeTab, setActiveTab, onLogout, notifications, onDismissNotification, userProfile }: LayoutProps) {
+export function Layout({ children, activeTab, setActiveTab, onLogout, notifications, onDismissNotification, userProfile, deferredPrompt, setDeferredPrompt }: LayoutProps) {
   const [showMore, setShowMore] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+
+  const handleInstallClick = async () => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    if (isIOS) {
+      alert('iOS ডিভাইসে ইন্সটল করতে:\n১. ব্রাউজারের নিচে "Share" আইকনে ক্লিক করুন।\n২. নিচে স্ক্রল করে "Add to Home Screen" এ ক্লিক করুন।');
+      return;
+    }
+    if (!deferredPrompt) {
+      alert('আপনার ব্রাউজারে "Add to Home Screen" বা "Install App" অপশনটি ব্যবহার করে অ্যাপটি ইন্সটল করুন।');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -127,6 +146,13 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, notificati
                 {notifications.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={handleInstallClick}
+            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-emerald-600 hover:bg-emerald-50 transition-colors"
+          >
+            <Download className="h-5 w-5" />
+            অ্যাপটি ইন্সটল করুন
           </button>
           <button
             onClick={onLogout}
