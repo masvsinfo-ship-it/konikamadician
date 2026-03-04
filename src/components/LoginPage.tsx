@@ -47,10 +47,19 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) {
-      alert('আপনার ব্রাউজারে "Add to Home Screen" অপশনটি ব্যবহার করে অ্যাপটি ইন্সটল করুন।');
+    // Check if it's iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    
+    if (isIOS) {
+      alert('iOS ডিভাইসে ইন্সটল করতে:\n১. ব্রাউজারের নিচে "Share" আইকনে ক্লিক করুন।\n২. নিচে স্ক্রল করে "Add to Home Screen" এ ক্লিক করুন।');
       return;
     }
+
+    if (!deferredPrompt) {
+      alert('আপনার ব্রাউজারে "Add to Home Screen" বা "Install App" অপশনটি ব্যবহার করে অ্যাপটি ইন্সটল করুন।');
+      return;
+    }
+    
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
@@ -412,7 +421,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             className="w-full bg-white/50 backdrop-blur-sm border border-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-slate-600 font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-3 group shadow-sm"
           >
             <Smartphone className="h-5 w-5 text-emerald-500" />
-            <span>Android App ইন্সটল করুন</span>
+            <span>অ্যাপটি ইন্সটল করুন</span>
             <Download className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
           
