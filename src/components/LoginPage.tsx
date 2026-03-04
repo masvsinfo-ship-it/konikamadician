@@ -413,11 +413,14 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
         >
           <button
             onClick={handleInstallClick}
-            className="w-full bg-white/50 backdrop-blur-sm border border-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-slate-600 font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-3 group shadow-sm"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-3 group shadow-lg shadow-emerald-200"
           >
-            <Smartphone className="h-5 w-5 text-emerald-500" />
-            <span>অ্যাপটি ইন্সটল করুন</span>
-            <Download className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Smartphone className="h-6 w-6" />
+            <div className="text-left">
+              <div className="text-xs opacity-80 font-medium leading-none">Get it on</div>
+              <div className="text-lg leading-tight">Android App</div>
+            </div>
+            <Download className="h-5 w-5 ml-auto animate-bounce" />
           </button>
           
           <div className="text-center space-y-4">

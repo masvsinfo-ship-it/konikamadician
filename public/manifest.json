@@ -6,6 +6,23 @@
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#10b981",
+  "categories": ["business", "finance"],
+  "screenshots": [
+    {
+      "src": "https://picsum.photos/seed/dokan1/1080/1920",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dashboard"
+    },
+    {
+      "src": "https://picsum.photos/seed/dokan2/1920/1080",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard Desktop"
+    }
+  ],
   "icons": [
     {
       "src": "https://img.icons8.com/color/192/notebook.png",
