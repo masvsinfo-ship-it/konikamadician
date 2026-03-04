@@ -1,5 +1,5 @@
 {
-  "name": "পাথর হিসাব ক্যালকুলেটর (Murubba Calculator)",
-  "description": "An easy-to-use tool for calculating stone volume and 'Murubba' units based on length, width, and height inputs, specifically designed for stone traders and construction projects.",
+  "name": "দোকানের খাতা",
+  "description": "একটি আধুনিক ডিজিটাল হিসাব খাতা এপ। দোকানের বাকি, নগদ বিক্রি, খরচ, শর্ট লিস্ট এবং GitHub ইন্টিগ্রেশন সহ সহজ সমাধান।",
   "requestFramePermissions": []
 }
