@@ -108,6 +108,25 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           setError(data.error || 'Registration failed');
         }
       } else {
+        if (serverStatus === 'offline') {
+          // Offline Login Logic
+          const savedProfile = localStorage.getItem('user_profile');
+          const savedLoginId = sessionStorage.getItem('loginId') || (savedProfile ? JSON.parse(savedProfile).mobile : null);
+          const savedPassword = sessionStorage.getItem('password');
+
+          if (savedProfile && savedLoginId === loginId && (savedPassword === password || !savedPassword)) {
+            const profile = JSON.parse(savedProfile);
+            onLogin({}, loginId, password, profile);
+            return;
+          } else if (savedProfile && savedLoginId === loginId) {
+            setError('পাসওয়ার্ড ভুল (অফলাইন মোড)');
+            setIsLoading(false);
+            return;
+          } else {
+            throw new Error('সার্ভার অফলাইন। অফলাইন লগইন করতে আগে অন্তত একবার লগইন করা থাকতে হবে।');
+          }
+        }
+
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -342,14 +361,18 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
                     <button
                       type="submit"
-                      disabled={isLoading || (serverStatus === 'offline' && !isRecovering)}
+                      disabled={isLoading}
                       className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 group mt-4 relative overflow-hidden"
                     >
                       {isLoading ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
                       ) : (
                         <>
-                          <span>{isRecovering ? 'পাসওয়ার্ড দেখুন' : (isRegistering ? 'একাউন্ট তৈরি করুন' : 'লগইন করুন')}</span>
+                          <span>
+                            {isRecovering ? 'পাসওয়ার্ড দেখুন' : 
+                             (isRegistering ? 'একাউন্ট তৈরি করুন' : 
+                              (serverStatus === 'offline' ? 'অফলাইন লগইন' : 'লগইন করুন'))}
+                          </span>
                           <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                         </>
                       )}

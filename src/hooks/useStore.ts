@@ -4,21 +4,58 @@ import { Transaction, Customer, ShortItem, AppSettings, DEFAULT_SETTINGS, Expens
 export function useStore() {
   const [loginId, setLoginId] = useState<string | null>(() => sessionStorage.getItem('loginId'));
   const [isInitialized, setIsInitialized] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+    const saved = localStorage.getItem('user_profile');
+    return saved ? JSON.parse(saved) : null;
+  });
 
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [shortList, setShortList] = useState<ShortItem[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('transactions');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [customers, setCustomers] = useState<Customer[]>(() => {
+    const saved = localStorage.getItem('customers');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [shortList, setShortList] = useState<ShortItem[]>(() => {
+    const saved = localStorage.getItem('shortList');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+    const saved = localStorage.getItem('expenses');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('settings');
+    return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
+  });
 
   const setAllData = (data: any, id: string, profile?: UserProfile) => {
-    if (data.transactions) setTransactions(data.transactions);
-    if (data.customers) setCustomers(data.customers);
-    if (data.shortList) setShortList(data.shortList);
-    if (data.expenses) setExpenses(data.expenses);
-    if (data.settings) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-    if (profile) setUserProfile(profile);
+    if (data.transactions) {
+      setTransactions(data.transactions);
+      localStorage.setItem('transactions', JSON.stringify(data.transactions));
+    }
+    if (data.customers) {
+      setCustomers(data.customers);
+      localStorage.setItem('customers', JSON.stringify(data.customers));
+    }
+    if (data.shortList) {
+      setShortList(data.shortList);
+      localStorage.setItem('shortList', JSON.stringify(data.shortList));
+    }
+    if (data.expenses) {
+      setExpenses(data.expenses);
+      localStorage.setItem('expenses', JSON.stringify(data.expenses));
+    }
+    if (data.settings) {
+      const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
+      setSettings(newSettings);
+      localStorage.setItem('settings', JSON.stringify(newSettings));
+    }
+    if (profile) {
+      setUserProfile(profile);
+      localStorage.setItem('user_profile', JSON.stringify(profile));
+    }
     setLoginId(id);
     setIsInitialized(true);
   };
@@ -32,10 +69,24 @@ export function useStore() {
     setUserProfile(null);
     setLoginId(null);
     setIsInitialized(false);
+    localStorage.removeItem('transactions');
+    localStorage.removeItem('customers');
+    localStorage.removeItem('shortList');
+    localStorage.removeItem('expenses');
+    localStorage.removeItem('settings');
+    localStorage.removeItem('user_profile');
   };
 
   useEffect(() => {
-    if (!isInitialized || !loginId) return;
+    if (!isInitialized) return;
+    localStorage.setItem('transactions', JSON.stringify(transactions));
+    localStorage.setItem('customers', JSON.stringify(customers));
+    localStorage.setItem('shortList', JSON.stringify(shortList));
+    localStorage.setItem('expenses', JSON.stringify(expenses));
+    localStorage.setItem('settings', JSON.stringify(settings));
+    if (userProfile) localStorage.setItem('user_profile', JSON.stringify(userProfile));
+
+    if (!loginId) return;
 
     const syncData = async () => {
       try {
@@ -48,13 +99,13 @@ export function useStore() {
           })
         });
       } catch (error) {
-        console.error('Failed to sync data:', error);
+        console.error('Failed to sync data to server:', error);
       }
     };
 
-    const timer = setTimeout(syncData, 1000);
+    const timer = setTimeout(syncData, 2000);
     return () => clearTimeout(timer);
-  }, [transactions, customers, shortList, expenses, settings, isInitialized, loginId]);
+  }, [transactions, customers, shortList, expenses, settings, isInitialized, loginId, userProfile]);
 
   const addTransaction = (transaction: Transaction) => {
     setTransactions(prev => [transaction, ...prev]);

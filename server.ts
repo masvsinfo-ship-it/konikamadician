@@ -229,16 +229,8 @@ app.post('/api/login', (req, res) => {
     res.status(404).json({ error: 'API route not found' });
   });
 
-  // Serve static files in production (only if not on Vercel)
-  if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
-    app.use(express.static('dist'));
-    app.get('*', (req, res) => {
-      if (!req.path.startsWith('/api')) {
-        res.sendFile(path.resolve('dist/index.html'));
-      }
-    });
-  } else if (process.env.NODE_ENV !== 'production') {
-    // Vite middleware for development
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -251,6 +243,7 @@ app.post('/api/login', (req, res) => {
     res.status(500).json({ error: 'Internal server error', details: err.message });
   });
 
+  // For Vercel, we don't call app.listen() if it's imported as a module
   if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://localhost:${PORT}`);

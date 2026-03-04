@@ -191,7 +191,43 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
                       <p className="text-xs text-emerald-600">ইউজারনাম: {userProfile.githubUsername}</p>
                     </div>
                   </div>
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm('আপনি কি নিশ্চিত যে আপনি GitHub অ্যাকাউন্টটি ডিসকানেক্ট করতে চান?')) {
+                          try {
+                            const res = await fetch('/api/update-profile', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                currentLoginId: userProfile.mobile,
+                                newLoginId: userProfile.mobile,
+                                name: userProfile.name,
+                                shopName: userProfile.shopName,
+                                address: userProfile.address,
+                                password: sessionStorage.getItem('password'),
+                                profilePic: userProfile.profilePic,
+                                githubId: null,
+                                githubUsername: null
+                              })
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                              onUpdateProfile(data.profile);
+                              alert('GitHub অ্যাকাউন্ট সফলভাবে ডিসকানেক্ট হয়েছে।');
+                            }
+                          } catch (err) {
+                            alert('ডিসকানেক্ট করতে সমস্যা হয়েছে।');
+                          }
+                        }
+                      }}
+                      className="text-xs font-bold text-red-500 hover:text-red-600 underline"
+                    >
+                      সরিয়ে ফেলুন
+                    </button>
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  </div>
                 </div>
               ) : (
                 <button

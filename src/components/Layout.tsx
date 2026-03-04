@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, BookOpen, Smartphone, Users, ListTodo, Settings as SettingsIcon, LogOut, Receipt, Menu, TrendingUp, Bell, X, User } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Smartphone, Users, ListTodo, Settings as SettingsIcon, LogOut, Receipt, Menu, TrendingUp, Bell, X, User, CloudOff, Cloud } from 'lucide-react';
 import { UserProfile } from '../types';
 
 export interface AppNotification {
@@ -23,6 +23,21 @@ interface LayoutProps {
 export function Layout({ children, activeTab, setActiveTab, onLogout, notifications, onDismissNotification, userProfile }: LayoutProps) {
   const [showMore, setShowMore] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const res = await fetch('/api/health').catch(() => null);
+        setIsOnline(!!(res && res.ok));
+      } catch {
+        setIsOnline(false);
+      }
+    };
+    checkStatus();
+    const interval = setInterval(checkStatus, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     setShowMore(false);
@@ -59,8 +74,15 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, notificati
       
       {/* Sidebar for Desktop */}
       <aside className="hidden md:flex w-64 flex-col border-r border-slate-200 bg-white/80 backdrop-blur-md relative z-10">
-        <div className="flex h-16 items-center justify-center border-b border-slate-200 px-4">
-          <h1 className="text-lg font-bold text-emerald-600 truncate max-w-full">{userProfile?.shopName || 'দোকানের খাতা'}</h1>
+        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
+          <h1 className="text-lg font-bold text-emerald-600 truncate max-w-[180px]">{userProfile?.shopName || 'দোকানের খাতা'}</h1>
+          <div title={isOnline ? 'সার্ভার অনলাইন' : 'অফলাইন মোড (লোকাল স্টোরেজ)'}>
+            {isOnline ? (
+              <Cloud className="h-4 w-4 text-emerald-500" />
+            ) : (
+              <CloudOff className="h-4 w-4 text-amber-500" />
+            )}
+          </div>
         </div>
         <nav className="flex-1 space-y-1 p-4">
           {allNavItems.map((item) => (
@@ -119,7 +141,10 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, notificati
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto relative z-10">
         <div className="md:hidden flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 backdrop-blur-md px-4 sticky top-0 z-10">
-          <h1 className="text-lg font-bold text-emerald-600 truncate max-w-[200px]">{userProfile?.shopName || 'কনিকা মেডিসিন কর্ণার'}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-emerald-600 truncate max-w-[160px]">{userProfile?.shopName || 'কনিকা মেডিসিন কর্ণার'}</h1>
+            {!isOnline && <CloudOff className="h-3 w-3 text-amber-500" />}
+          </div>
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowNotifications(true)}
