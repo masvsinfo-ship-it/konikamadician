@@ -186,7 +186,7 @@ app.get('/api/auth/github/url', (req, res) => {
   const params = new URLSearchParams({
     client_id: process.env.GITHUB_CLIENT_ID!,
     redirect_uri: redirectUri,
-    scope: 'read:user user:email',
+    scope: 'read:user user:email gist',
   });
   const authUrl = `https://github.com/login/oauth/authorize?${params}`;
   res.json({ url: authUrl });
@@ -228,7 +228,8 @@ app.get('/api/auth/github/callback', async (req, res) => {
                 type: 'OAUTH_AUTH_SUCCESS', 
                 provider: 'github',
                 githubId: '${userData.id}',
-                githubUsername: '${userData.login}'
+                githubUsername: '${userData.login}',
+                accessToken: '${tokenData.access_token}'
               }, '*');
               window.close();
             } else {

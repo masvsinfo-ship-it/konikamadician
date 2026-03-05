@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, BookOpen, ArrowRight, Download, Smartphone, Facebook, MessageCircle, AlertCircle, CheckCircle2, Loader2, UserPlus, LogIn, KeyRound } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { 
+  Lock, 
+  BookOpen, 
+  ArrowRight, 
+  Download, 
+  Smartphone, 
+  Facebook, 
+  MessageCircle, 
+  AlertCircle, 
+  CheckCircle2, 
+  Loader2, 
+  UserPlus, 
+  LogIn, 
+  KeyRound,
+  ShieldCheck,
+  CloudLightning,
+  LayoutDashboard
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LoginPageProps {
@@ -9,9 +25,10 @@ interface LoginPageProps {
   setDeferredPrompt: (prompt: any) => void;
 }
 
+type AuthMode = 'login' | 'register' | 'recover';
+
 export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginPageProps) {
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [isRecovering, setIsRecovering] = useState(false);
+  const [mode, setMode] = useState<AuthMode>('login');
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -21,76 +38,33 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   const [recoveredPassword, setRecoveredPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
   useEffect(() => {
     const checkServer = async () => {
       try {
         const res = await fetch('/api/health');
-        if (res.ok) setServerStatus('online');
-        else setServerStatus('offline');
+        setServerStatus(res.ok ? 'online' : 'offline');
       } catch (e) {
         setServerStatus('offline');
       }
     };
     checkServer();
     const interval = setInterval(checkServer, 30000);
-
-    return () => {
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, []);
 
-  const handleInstallClick = async () => {
-    // Check if app is already installed
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-    if (isStandalone) {
-      alert('অ্যাপটি ইতিমধ্যেই আপনার ডিভাইসে ইন্সটল করা আছে।');
-      return;
-    }
-
-    // Check if it's iOS
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    
-    if (isIOS) {
-      alert('iOS ডিভাইসে ইন্সটল করতে:\n১. ব্রাউজারের নিচে "Share" আইকনে ক্লিক করুন।\n২. নিচে স্ক্রল করে "Add to Home Screen" এ ক্লিক করুন।');
-      return;
-    }
-
+  const handleInstall = async () => {
     if (!deferredPrompt) {
-      alert('ইন্সটল অপশনটি এখনও প্রস্তুত হয়নি। দয়া করে কয়েক সেকেন্ড অপেক্ষা করুন অথবা পেইজটি রিফ্রেশ করুন। ব্রাউজার নিশ্চিত হতে চায় যে আপনি এই সাইটটি ব্যবহার করছেন।');
+      alert('ইন্সটল অপশনটি এখনও প্রস্তুত হয়নি। ব্রাউজারের মেনু থেকে "Install App" বা "Add to Home Screen" ব্যবহার করুন।');
       return;
     }
-    
-    setIsDownloading(true);
-    setDownloadProgress(0);
-
-    // Simulate APK download progress
-    const interval = setInterval(() => {
-      setDownloadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + Math.floor(Math.random() * 15) + 5;
-      });
-    }, 200);
-
-    // Wait for simulation to finish
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    setIsDownloading(false);
-    
     try {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
+      if (outcome === 'accepted') setDeferredPrompt(null);
     } catch (err) {
-      console.error('Install prompt error:', err);
-      alert('ইন্সটল করার সময় একটি সমস্যা হয়েছে। দয়া করে ব্রাউজারের মেনু থেকে "Install App" বা "Add to Home Screen" অপশনটি ব্যবহার করুন।');
+      console.error('Install error:', err);
     }
   };
 
@@ -100,52 +74,27 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
     setIsLoading(true);
 
     try {
-      if (isRecovering) {
+      if (mode === 'recover') {
         const res = await fetch('/api/recover-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ loginId, lastTransactionAmount })
         });
-        const text = await res.text();
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          if (text.includes('<html') || text.includes('<!DOCTYPE')) {
-            throw new Error(`সার্ভার সাময়িকভাবে বন্ধ আছে বা ইন্টারনেট সমস্যা (Error ${res.status})`);
-          }
-          throw new Error(`Invalid server response: ${text.substring(0, 50)}`);
-        }
-        if (data.success) {
-          setRecoveredPassword(data.password);
-        } else {
-          setError(data.error || 'Recovery failed');
-        }
-      } else if (isRegistering) {
+        const data = await res.json();
+        if (data.success) setRecoveredPassword(data.password);
+        else setError(data.error || 'পাসওয়ার্ড উদ্ধার করা সম্ভব হয়নি।');
+      } else if (mode === 'register') {
         const res = await fetch('/api/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ loginId, password, name, shopName, address })
         });
-        const text = await res.text();
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          console.error('Failed to parse JSON:', text);
-          if (text.includes('<html') || text.includes('<!DOCTYPE')) {
-            throw new Error(`সার্ভার সাময়িকভাবে বন্ধ আছে বা ইন্টারনেট সমস্যা (Error ${res.status})`);
-          }
-          throw new Error(`Invalid server response: ${text.substring(0, 50)}`);
-        }
-        if (data.success) {
-          onLogin({}, loginId, password, data.profile);
-        } else {
-          setError(data.error || 'Registration failed');
-        }
+        const data = await res.json();
+        if (data.success) onLogin({}, loginId, password, data.profile);
+        else setError(data.error || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে।');
       } else {
+        // Login Logic
         if (serverStatus === 'offline') {
-          // Offline Login Logic
           const savedLoginId = localStorage.getItem('loginId');
           const savedPassword = localStorage.getItem('password');
           const savedProfile = localStorage.getItem(`user_profile_${loginId}`);
@@ -161,12 +110,10 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
             };
             onLogin(savedData, loginId, password, profile);
             return;
-          } else if (savedLoginId === loginId) {
-            setError('পাসওয়ার্ড ভুল (অফলাইন মোড)');
+          } else {
+            setError('সার্ভার অফলাইন এবং অফলাইন লগইন তথ্য পাওয়া যায়নি।');
             setIsLoading(false);
             return;
-          } else {
-            throw new Error('সার্ভার অফলাইন। অফলাইন লগইন করতে আগে অন্তত একবার লগইন করা থাকতে হবে।');
           }
         }
 
@@ -175,342 +122,300 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ loginId, password })
         });
-        const text = await res.text();
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          console.error('Failed to parse JSON:', text);
-          if (text.includes('<html') || text.includes('<!DOCTYPE')) {
-            throw new Error(`সার্ভার সাময়িকভাবে বন্ধ আছে বা ইন্টারনেট সমস্যা (Error ${res.status})`);
-          }
-          throw new Error(`Invalid server response: ${text.substring(0, 50)}`);
-        }
-        if (data.success) {
-          onLogin(data.data, loginId, password, data.profile);
-        } else {
-          setError(data.error || 'Login failed');
-        }
+        const data = await res.json();
+        if (data.success) onLogin(data.data, loginId, password, data.profile);
+        else setError(data.error || 'লগইন ব্যর্থ হয়েছে। সঠিক তথ্য দিন।');
       }
     } catch (err: any) {
-      console.error('Login error:', err);
-      setError(`Network error: ${err.message}`);
+      setError('নেটওয়ার্ক সমস্যা। আবার চেষ্টা করুন।');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-4 relative overflow-hidden font-sans">
-      {/* Background Gradients */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-100/40 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-100/40 rounded-full blur-[120px]" />
-      </div>
-      
-      <div className="w-full max-w-[440px] space-y-6 relative z-10">
-        {/* Header Section */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-2"
-        >
-          <div className="mx-auto h-20 w-20 bg-white rounded-3xl flex items-center justify-center text-emerald-600 shadow-sm border border-slate-100 mb-4">
-            <BookOpen className="h-10 w-10" />
+    <div className="min-h-screen grid lg:grid-cols-2 bg-white selection:bg-emerald-100 selection:text-emerald-900">
+      {/* Left Pane - Brand & Info (Desktop Only) */}
+      <div className="hidden lg:flex flex-col justify-between p-12 bg-emerald-600 text-white relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.2),transparent_70%)]" />
+          <div className="grid grid-cols-10 gap-4 p-8">
+            {Array.from({ length: 100 }).map((_, i) => (
+              <div key={i} className="h-1 w-1 bg-white rounded-full opacity-20" />
+            ))}
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">দোকানের খাতা</h1>
-          <p className="text-slate-500 font-medium">আপনার ব্যবসার ডিজিটাল হিসাবরক্ষক</p>
-          
-          {/* Server Status Badge */}
-          <div className="flex justify-center pt-2">
-            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-              serverStatus === 'online' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-              serverStatus === 'offline' ? 'bg-red-50 text-red-600 border-red-100' : 
-              'bg-slate-50 text-slate-400 border-slate-100'
-            }`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                serverStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 
-                serverStatus === 'offline' ? 'bg-red-500' : 
-                'bg-slate-300'
-              }`} />
-              {serverStatus === 'online' ? 'সার্ভার অনলাইন' : 
-               serverStatus === 'offline' ? 'সার্ভার অফলাইন' : 
-               'সার্ভার চেক করা হচ্ছে...'}
+        </div>
+
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-12">
+            <div className="h-12 w-12 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-xl">
+              <BookOpen className="h-7 w-7" />
+            </div>
+            <span className="text-2xl font-black tracking-tight">দোকানের খাতা</span>
+          </div>
+
+          <div className="space-y-8 max-w-md">
+            <h1 className="text-6xl font-black leading-[1.1] tracking-tighter">
+              আপনার ব্যবসার <br />
+              <span className="text-emerald-200">ডিজিটাল</span> হিসাবরক্ষক
+            </h1>
+            <p className="text-xl text-emerald-50/80 font-medium leading-relaxed">
+              সহজ, নিরাপদ এবং আধুনিক পদ্ধতিতে আপনার দোকানের বাকি-নগদ হিসাব রাখুন। যেকোনো জায়গা থেকে যেকোনো সময়।
+            </p>
+
+            <div className="grid gap-6 pt-8">
+              {[
+                { icon: ShieldCheck, title: '১০০% নিরাপদ', desc: 'আপনার সকল তথ্য ক্লাউডে এনক্রিপ্টেড অবস্থায় থাকে।' },
+                { icon: CloudLightning, title: 'দ্রুত ও সহজ', desc: 'খুব সহজেই লেনদেন এন্ট্রি এবং কাস্টমার ম্যানেজমেন্ট।' },
+                { icon: LayoutDashboard, title: 'স্মার্ট ড্যাশবোর্ড', desc: 'এক নজরে লাভ-ক্ষতি এবং বকেয়া টাকার হিসাব।' },
+              ].map((item, i) => (
+                <div key={i} className="flex gap-4">
+                  <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                    <item.icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg">{item.title}</h4>
+                    <p className="text-sm text-emerald-50/60">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="border-none shadow-2xl shadow-slate-200/50 bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
-            <CardHeader className="pb-4 pt-8 px-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-2xl font-black text-slate-900">
-                    {isRecovering ? 'পাসওয়ার্ড পুনরুদ্ধার' : (isRegistering ? 'নতুন একাউন্ট' : 'স্বাগতম')}
-                  </CardTitle>
-                  <CardDescription className="text-slate-500 font-medium mt-1">
-                    {isRecovering ? 'প্রয়োজনীয় তথ্য দিয়ে পাসওয়ার্ড দেখুন' : (isRegistering ? 'আপনার দোকানের তথ্য দিয়ে শুরু করুন' : 'আপনার একাউন্টে প্রবেশ করুন')}
-                  </CardDescription>
-                </div>
-                <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400">
-                  {isRecovering ? <KeyRound className="h-6 w-6" /> : (isRegistering ? <UserPlus className="h-6 w-6" /> : <LogIn className="h-6 w-6" />)}
-                </div>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="px-8 pb-8">
-              <AnimatePresence mode="wait">
-                {recoveredPassword ? (
-                  <motion.div 
-                    key="recovered"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-6 py-4"
+        <div className="relative z-10 flex items-center justify-between pt-12 border-t border-white/10">
+          <div className="flex gap-4">
+            <a href="https://fb.com/billal8795" target="_blank" className="hover:scale-110 transition-transform"><Facebook className="h-5 w-5" /></a>
+            <a href="https://wa.me/8801735308795" target="_blank" className="hover:scale-110 transition-transform"><MessageCircle className="h-5 w-5" /></a>
+          </div>
+          <p className="text-xs font-bold opacity-60 uppercase tracking-widest">© {new Date().getFullYear()} কনিকা মেডিসিন কর্ণার</p>
+        </div>
+      </div>
+
+      {/* Right Pane - Auth Form */}
+      <div className="flex flex-col justify-center items-center p-6 lg:p-12 bg-slate-50/50">
+        <div className="w-full max-w-[420px] space-y-8">
+          {/* Mobile Logo */}
+          <div className="lg:hidden flex flex-col items-center gap-4 mb-8">
+            <div className="h-16 w-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
+              <BookOpen className="h-9 w-9" />
+            </div>
+            <div className="text-center">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">দোকানের খাতা</h1>
+              <p className="text-emerald-600 font-bold text-xs uppercase tracking-widest">ডিজিটাল হিসাব খাতা</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-8 lg:p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 relative">
+            {/* Server Status Dot */}
+            <div className="absolute top-6 right-8 flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${serverStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {serverStatus === 'online' ? 'Online' : 'Offline'}
+              </span>
+            </div>
+
+            <div className="mb-8">
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+                {mode === 'login' ? 'স্বাগতম!' : mode === 'register' ? 'নতুন একাউন্ট' : 'পাসওয়ার্ড উদ্ধার'}
+              </h2>
+              <p className="text-slate-500 font-medium mt-1">
+                {mode === 'login' ? 'আপনার একাউন্টে লগইন করুন' : mode === 'register' ? 'আপনার দোকানের তথ্য দিন' : 'প্রয়োজনীয় তথ্য দিয়ে পাসওয়ার্ড দেখুন'}
+              </p>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {recoveredPassword ? (
+                <motion.div
+                  key="recovered"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-6"
+                >
+                  <div className="p-8 bg-emerald-50 rounded-3xl border border-emerald-100 text-center">
+                    <p className="text-xs text-emerald-600 font-black uppercase tracking-[0.2em] mb-3">আপনার পাসওয়ার্ড</p>
+                    <p className="text-5xl font-black text-emerald-900 tracking-widest">{recoveredPassword}</p>
+                  </div>
+                  <button
+                    onClick={() => { setRecoveredPassword(''); setMode('login'); }}
+                    className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-slate-800 transition-all"
                   >
-                    <div className="p-6 bg-emerald-50 rounded-[1.5rem] border border-emerald-100 text-center">
-                      <p className="text-sm text-emerald-600 font-bold mb-3 uppercase tracking-widest">আপনার পাসওয়ার্ড</p>
-                      <p className="text-4xl font-black text-emerald-900 tracking-[0.2em]">{recoveredPassword}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setRecoveredPassword('');
-                        setIsRecovering(false);
-                        setPassword('');
-                      }}
-                      className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-slate-900/10"
-                    >
-                      লগইন পেইজে ফিরে যান
-                    </button>
-                  </motion.div>
-                ) : (
-                  <motion.form 
-                    key="form"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    onSubmit={handleSubmit} 
-                    className="space-y-4"
-                  >
-                    {isRegistering && !isRecovering && (
-                      <div className="grid gap-4">
+                    লগইন করুন
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.form
+                  key={mode}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  onSubmit={handleSubmit}
+                  className="space-y-5"
+                >
+                  {mode === 'register' && (
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">আপনার নাম</label>
+                        <input
+                          type="text"
+                          required
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-medium"
+                          placeholder="যেমন: মোঃ আব্দুল্লাহ"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">আপনার নাম</label>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">দোকানের নাম</label>
                           <input
                             type="text"
-                            value={name}
-                            onChange={(e) => { setName(e.target.value); setError(''); }}
-                            className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-medium"
-                            placeholder="যেমন: মোঃ আব্দুল্লাহ"
                             required
+                            value={shopName}
+                            onChange={(e) => setShopName(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-medium"
+                            placeholder="দোকানের নাম"
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">দোকানের নাম</label>
-                            <input
-                              type="text"
-                              value={shopName}
-                              onChange={(e) => { setShopName(e.target.value); setError(''); }}
-                              className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-medium"
-                              placeholder="দোকানের নাম"
-                              required
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">ঠিকানা</label>
-                            <input
-                              type="text"
-                              value={address}
-                              onChange={(e) => { setAddress(e.target.value); setError(''); }}
-                              className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-medium"
-                              placeholder="শহর/গ্রাম"
-                              required
-                            />
-                          </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ঠিকানা</label>
+                          <input
+                            type="text"
+                            required
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-medium"
+                            placeholder="শহর/গ্রাম"
+                          />
                         </div>
                       </div>
-                    )}
+                    </div>
+                  )}
 
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">মোবাইল নাম্বার</label>
+                    <div className="relative">
+                      <Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
+                      <input
+                        type="tel"
+                        required
+                        value={loginId}
+                        onChange={(e) => setLoginId(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-14 pr-5 py-4 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-bold text-lg"
+                        placeholder="017XXXXXXXX"
+                      />
+                    </div>
+                  </div>
+
+                  {mode === 'recover' ? (
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">মোবাইল নাম্বার</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">সর্বশেষ লেনদেনের পরিমাণ</label>
+                      <input
+                        type="number"
+                        required
+                        value={lastTransactionAmount}
+                        onChange={(e) => setLastTransactionAmount(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-bold"
+                        placeholder="যেমন: ৫০০"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center px-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">পাসওয়ার্ড</label>
+                        {mode === 'login' && (
+                          <button 
+                            type="button" 
+                            onClick={() => setMode('recover')}
+                            className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline"
+                          >
+                            ভুলে গেছেন?
+                          </button>
+                        )}
+                      </div>
                       <div className="relative">
-                        <Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
+                        <Lock className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
                         <input
-                          type="tel"
-                          value={loginId}
-                          onChange={(e) => { setLoginId(e.target.value); setError(''); }}
-                          className="w-full bg-slate-50 border-none rounded-2xl pl-14 pr-5 py-3.5 text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-medium text-lg"
-                          placeholder="017XXXXXXXX"
+                          type="password"
                           required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-14 pr-5 py-4 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-bold text-lg"
+                          placeholder="••••••••"
                         />
                       </div>
                     </div>
+                  )}
 
-                    {isRecovering ? (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">সর্বশেষ লেনদেনের পরিমাণ</label>
-                        <input
-                          type="number"
-                          value={lastTransactionAmount}
-                          onChange={(e) => { setLastTransactionAmount(e.target.value); setError(''); }}
-                          className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-medium"
-                          placeholder="যেমন: 500"
-                          required
-                        />
-                        <p className="text-[10px] text-slate-400 font-medium ml-1 italic">* নিরাপত্তা নিশ্চিত করতে শেষ লেনদেনের সঠিক পরিমাণ দিন</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center ml-1">
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">পাসওয়ার্ড</label>
-                          {!isRegistering && (
-                            <button
-                              type="button"
-                              onClick={() => { setIsRecovering(true); setError(''); }}
-                              className="text-[10px] text-emerald-600 font-bold hover:underline uppercase tracking-wider"
-                            >
-                              ভুলে গেছেন?
-                            </button>
-                          )}
-                        </div>
-                        <div className="relative">
-                          <Lock className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-                          <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                            className="w-full bg-slate-50 border-none rounded-2xl pl-14 pr-5 py-3.5 text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-medium text-lg"
-                            placeholder="••••••••"
-                            required
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {error && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-start gap-2 p-4 bg-red-50 rounded-2xl border border-red-100 text-red-600"
-                      >
-                        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-                        <p className="text-xs font-bold leading-relaxed">{error}</p>
-                      </motion.div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 group mt-4 relative overflow-hidden"
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3 text-red-600"
                     >
-                      {isLoading ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <>
-                          <span>
-                            {isRecovering ? 'পাসওয়ার্ড দেখুন' : 
-                             (isRegistering ? 'একাউন্ট তৈরি করুন' : 
-                              (serverStatus === 'offline' ? 'অফলাইন লগইন' : 'লগইন করুন'))}
-                          </span>
-                          <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                        </>
-                      )}
-                    </button>
-                  </motion.form>
-                )}
-              </AnimatePresence>
-              
-              {!recoveredPassword && (
-                <div className="mt-8 text-center">
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      if (isRecovering) setIsRecovering(false);
-                      else setIsRegistering(!isRegistering);
-                      setError('');
-                    }}
-                    className="text-sm text-slate-500 hover:text-emerald-600 font-bold transition-colors"
-                  >
-                    {isRecovering ? 'লগইন পেইজে ফিরে যান' : (isRegistering ? 'আগে থেকে একাউন্ট আছে? লগইন করুন' : 'নতুন একাউন্ট খুলতে চান? এখানে ক্লিক করুন')}
-                  </button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+                      <AlertCircle className="h-5 w-5 shrink-0" />
+                      <p className="text-xs font-bold leading-tight">{error}</p>
+                    </motion.div>
+                  )}
 
-        {/* Footer Actions */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-6"
-        >
-          <button
-            onClick={handleInstallClick}
-            disabled={isDownloading}
-            className={`w-full ${isDownloading ? 'bg-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-bold py-4 rounded-2xl transition-all flex flex-col items-center justify-center gap-1 group shadow-lg shadow-emerald-200 relative overflow-hidden`}
-          >
-            {isDownloading ? (
-              <div className="w-full px-6 space-y-2">
-                <div className="flex justify-between text-[10px] text-emerald-700 uppercase tracking-widest font-black">
-                  <span>Downloading APK...</span>
-                  <span>{downloadProgress}%</span>
-                </div>
-                <div className="w-full h-1.5 bg-emerald-200 rounded-full overflow-hidden">
-                  <motion.div 
-                    className="h-full bg-emerald-600"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${downloadProgress}%` }}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-3 w-full">
-                <Smartphone className="h-6 w-6" />
-                <div className="text-left">
-                  <div className="text-xs opacity-80 font-medium leading-none">Get it on</div>
-                  <div className="text-lg leading-tight">Android App</div>
-                </div>
-                <Download className="h-5 w-5 ml-auto animate-bounce" />
-              </div>
-            )}
-          </button>
-          
-          <div className="text-center space-y-4">
-            <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
-              <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-              <span>সকল তথ্য ক্লাউডে সুরক্ষিত</span>
-            </div>
-            
-            <div className="pt-6 border-t border-slate-200/60">
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black mb-4">Developed By</p>
-              <div className="flex items-center justify-center gap-3">
-                <a 
-                  href="https://fb.com/billal8795" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="h-10 w-10 flex items-center justify-center text-blue-600 bg-white rounded-xl shadow-sm border border-slate-100 hover:scale-110 transition-transform"
-                >
-                  <Facebook className="h-5 w-5" />
-                </a>
-                <a 
-                  href="https://wa.me/8801735308795" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="h-10 w-10 flex items-center justify-center text-emerald-600 bg-white rounded-xl shadow-sm border border-slate-100 hover:scale-110 transition-transform"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                </a>
-              </div>
-              <p className="text-[10px] text-slate-400 font-bold mt-4">© {new Date().getFullYear()} কনিকা মেডিসিন কর্ণার | জামালপুর</p>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 group mt-4"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <span>
+                          {mode === 'login' ? 'লগইন করুন' : mode === 'register' ? 'একাউন্ট তৈরি করুন' : 'পাসওয়ার্ড দেখুন'}
+                        </span>
+                        <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                </motion.form>
+              )}
+            </AnimatePresence>
+
+            <div className="mt-8 pt-8 border-t border-slate-100 text-center">
+              <button
+                onClick={() => {
+                  setMode(mode === 'login' ? 'register' : 'login');
+                  setError('');
+                  setRecoveredPassword('');
+                }}
+                className="text-sm font-bold text-slate-400 hover:text-emerald-600 transition-colors"
+              >
+                {mode === 'login' ? 'নতুন একাউন্ট খুলতে চান? এখানে ক্লিক করুন' : 'আগে থেকে একাউন্ট আছে? লগইন করুন'}
+              </button>
             </div>
           </div>
-        </motion.div>
+
+          {/* App Install & Footer */}
+          <div className="space-y-6">
+            <button
+              onClick={handleInstall}
+              className="w-full bg-white border border-slate-200 p-4 rounded-3xl flex items-center gap-4 hover:bg-slate-50 transition-all group"
+            >
+              <div className="h-12 w-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                <Smartphone className="h-6 w-6" />
+              </div>
+              <div className="text-left">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Get it on Android</p>
+                <p className="text-lg font-black text-slate-900 leading-none">Install Web App</p>
+              </div>
+              <Download className="h-5 w-5 text-slate-300 ml-auto group-hover:translate-y-1 transition-transform" />
+            </button>
+
+            <div className="text-center space-y-4">
+              <div className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                <span>সকল তথ্য ক্লাউডে সুরক্ষিত</span>
+              </div>
+              <p className="text-[10px] font-bold text-slate-300">© {new Date().getFullYear()} কনিকা মেডিসিন কর্ণার | জামালপুর</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

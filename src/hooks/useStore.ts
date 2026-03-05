@@ -116,6 +116,7 @@ export function useStore() {
 
     const syncData = async () => {
       try {
+        // Sync to local server
         await fetch('/api/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -124,8 +125,67 @@ export function useStore() {
             data: { transactions, customers, shortList, expenses, settings }
           })
         });
+
+        // Sync to GitHub if token available
+        const githubToken = localStorage.getItem(`github_token_${loginId}`);
+        if (githubToken) {
+          const data = { transactions, customers, shortList, expenses, settings };
+          const fileName = `dokaner_khata_${loginId}.json`;
+          
+          // 1. Find or create Gist
+          let gistId = localStorage.getItem(`github_gist_id_${loginId}`);
+          
+          if (!gistId) {
+            // Search for existing gist
+            const gistsRes = await fetch('https://api.github.com/gists', {
+              headers: { 'Authorization': `token ${githubToken}` }
+            });
+            const gists = await gistsRes.json();
+            const existingGist = gists.find((g: any) => g.files[fileName]);
+            if (existingGist) {
+              gistId = existingGist.id;
+              localStorage.setItem(`github_gist_id_${loginId}`, gistId!);
+            }
+          }
+
+          if (gistId) {
+            // Update existing gist
+            await fetch(`https://api.github.com/gists/${gistId}`, {
+              method: 'PATCH',
+              headers: { 
+                'Authorization': `token ${githubToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                files: {
+                  [fileName]: { content: JSON.stringify(data, null, 2) }
+                }
+              })
+            });
+          } else {
+            // Create new gist
+            const createRes = await fetch('https://api.github.com/gists', {
+              method: 'POST',
+              headers: { 
+                'Authorization': `token ${githubToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                description: 'Dokaner Khata Backup',
+                public: false,
+                files: {
+                  [fileName]: { content: JSON.stringify(data, null, 2) }
+                }
+              })
+            });
+            const newGist = await createRes.json();
+            if (newGist.id) {
+              localStorage.setItem(`github_gist_id_${loginId}`, newGist.id);
+            }
+          }
+        }
       } catch (error) {
-        console.error('Failed to sync data to server:', error);
+        console.error('Failed to sync data:', error);
       }
     };
 
@@ -261,6 +321,36 @@ export function useStore() {
     }
   };
 
+  const restoreFromGithub = async () => {
+    if (!loginId) return;
+    const githubToken = localStorage.getItem(`github_token_${loginId}`);
+    if (!githubToken) {
+      alert('GitHub কানেক্ট করা নেই!');
+      return;
+    }
+
+    try {
+      const fileName = `dokaner_khata_${loginId}.json`;
+      const gistsRes = await fetch('https://api.github.com/gists', {
+        headers: { 'Authorization': `token ${githubToken}` }
+      });
+      const gists = await gistsRes.json();
+      const gist = gists.find((g: any) => g.files[fileName]);
+      
+      if (gist) {
+        const fileRes = await fetch(gist.files[fileName].raw_url);
+        const data = await fileRes.json();
+        setAllData(data, loginId, userProfile || undefined);
+        alert('GitHub থেকে তথ্য সফলভাবে রিস্টোর করা হয়েছে!');
+      } else {
+        alert('GitHub-এ কোনো ব্যাকআপ পাওয়া যায়নি।');
+      }
+    } catch (error) {
+      console.error('Failed to restore from GitHub:', error);
+      alert('রিস্টোর করতে সমস্যা হয়েছে।');
+    }
+  };
+
   return {
     transactions,
     customers,
@@ -287,5 +377,6 @@ export function useStore() {
     editExpense,
     deleteExpense,
     resetAllData,
+    restoreFromGithub,
   };
 }

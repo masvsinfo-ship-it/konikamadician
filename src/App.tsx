@@ -71,6 +71,7 @@ export default function App() {
     editExpense,
     deleteExpense,
     resetAllData,
+    restoreFromGithub,
   } = useStore();
 
   // Notification Logic
@@ -82,9 +83,12 @@ export default function App() {
       }
 
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.provider === 'github') {
-        const { githubId, githubUsername } = event.data;
+        const { githubId, githubUsername, accessToken } = event.data;
         if (userProfile) {
           try {
+            // Store token for sync
+            localStorage.setItem(`github_token_${userProfile.mobile}`, accessToken);
+            
             const res = await fetch('/api/update-profile', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -420,6 +424,7 @@ export default function App() {
             onUpdateSettings={setSettings}
             onUpdateProfile={setUserProfile}
             onResetData={resetAllData}
+            onRestoreFromGithub={restoreFromGithub}
           />
         );
       default:
