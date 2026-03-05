@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, BookOpen, Smartphone, Users, ListTodo, Settings as SettingsIcon, LogOut, Receipt, Menu, TrendingUp, Bell, X, User, CloudOff, Cloud, Download } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Smartphone, Users, ListTodo, Settings as SettingsIcon, LogOut, Receipt, Menu, TrendingUp, Bell, X, User, CloudOff, Cloud, Download, Loader2 } from 'lucide-react';
 import { UserProfile } from '../types';
 
 export interface AppNotification {
@@ -26,6 +26,8 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, notificati
   const [showMore, setShowMore] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   const handleInstallClick = async () => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
@@ -44,6 +46,22 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, notificati
       return;
     }
     
+    setIsDownloading(true);
+    setDownloadProgress(0);
+
+    const interval = setInterval(() => {
+      setDownloadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 150);
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setIsDownloading(false);
+
     try {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
@@ -161,10 +179,20 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, notificati
           </button>
           <button
             onClick={handleInstallClick}
-            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-emerald-600 hover:bg-emerald-50 transition-colors"
+            disabled={isDownloading}
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${isDownloading ? 'bg-emerald-50 text-emerald-400' : 'text-emerald-600 hover:bg-emerald-50'}`}
           >
-            <Download className="h-5 w-5" />
-            অ্যাপটি ইন্সটল করুন
+            {isDownloading ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>ইন্সটল হচ্ছে... {downloadProgress}%</span>
+              </>
+            ) : (
+              <>
+                <Download className="h-5 w-5" />
+                অ্যাপটি ইন্সটল করুন
+              </>
+            )}
           </button>
           <button
             onClick={onLogout}

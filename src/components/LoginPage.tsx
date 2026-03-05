@@ -21,6 +21,8 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   const [recoveredPassword, setRecoveredPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
   useEffect(() => {
@@ -61,6 +63,24 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
       alert('ইন্সটল অপশনটি এখনও প্রস্তুত হয়নি। দয়া করে কয়েক সেকেন্ড অপেক্ষা করুন অথবা পেইজটি রিফ্রেশ করুন। ব্রাউজার নিশ্চিত হতে চায় যে আপনি এই সাইটটি ব্যবহার করছেন।');
       return;
     }
+    
+    setIsDownloading(true);
+    setDownloadProgress(0);
+
+    // Simulate APK download progress
+    const interval = setInterval(() => {
+      setDownloadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + Math.floor(Math.random() * 15) + 5;
+      });
+    }, 200);
+
+    // Wait for simulation to finish
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    setIsDownloading(false);
     
     try {
       deferredPrompt.prompt();
@@ -425,14 +445,33 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
         >
           <button
             onClick={handleInstallClick}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-3 group shadow-lg shadow-emerald-200"
+            disabled={isDownloading}
+            className={`w-full ${isDownloading ? 'bg-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-bold py-4 rounded-2xl transition-all flex flex-col items-center justify-center gap-1 group shadow-lg shadow-emerald-200 relative overflow-hidden`}
           >
-            <Smartphone className="h-6 w-6" />
-            <div className="text-left">
-              <div className="text-xs opacity-80 font-medium leading-none">Get it on</div>
-              <div className="text-lg leading-tight">Android App</div>
-            </div>
-            <Download className="h-5 w-5 ml-auto animate-bounce" />
+            {isDownloading ? (
+              <div className="w-full px-6 space-y-2">
+                <div className="flex justify-between text-[10px] text-emerald-700 uppercase tracking-widest font-black">
+                  <span>Downloading APK...</span>
+                  <span>{downloadProgress}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-emerald-200 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-emerald-600"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-3 w-full">
+                <Smartphone className="h-6 w-6" />
+                <div className="text-left">
+                  <div className="text-xs opacity-80 font-medium leading-none">Get it on</div>
+                  <div className="text-lg leading-tight">Android App</div>
+                </div>
+                <Download className="h-5 w-5 ml-auto animate-bounce" />
+              </div>
+            )}
           </button>
           
           <div className="text-center space-y-4">
