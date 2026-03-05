@@ -2,65 +2,96 @@ import { useState, useEffect } from 'react';
 import { Transaction, Customer, ShortItem, AppSettings, DEFAULT_SETTINGS, Expense, UserProfile } from '../types';
 
 export function useStore() {
-  const [loginId, setLoginId] = useState<string | null>(() => sessionStorage.getItem('loginId'));
+  const [loginId, setLoginId] = useState<string | null>(() => localStorage.getItem('loginId'));
   const [isInitialized, setIsInitialized] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('user_profile');
+    const id = localStorage.getItem('loginId');
+    if (!id) return null;
+    const saved = localStorage.getItem(`user_profile_${id}`);
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('transactions');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem('customers');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [shortList, setShortList] = useState<ShortItem[]>(() => {
-    const saved = localStorage.getItem('shortList');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('expenses');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('settings');
-    return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
-  });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [shortList, setShortList] = useState<ShortItem[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+
+  // Load data from localStorage when loginId changes
+  useEffect(() => {
+    if (!loginId) {
+      setTransactions([]);
+      setCustomers([]);
+      setShortList([]);
+      setExpenses([]);
+      setSettings(DEFAULT_SETTINGS);
+      setUserProfile(null);
+      setIsInitialized(false);
+      return;
+    }
+
+    const tx = localStorage.getItem(`transactions_${loginId}`);
+    const cust = localStorage.getItem(`customers_${loginId}`);
+    const short = localStorage.getItem(`shortList_${loginId}`);
+    const exp = localStorage.getItem(`expenses_${loginId}`);
+    const sett = localStorage.getItem(`settings_${loginId}`);
+    const prof = localStorage.getItem(`user_profile_${loginId}`);
+
+    if (tx) setTransactions(JSON.parse(tx));
+    if (cust) setCustomers(JSON.parse(cust));
+    if (short) setShortList(JSON.parse(short));
+    if (exp) setExpenses(JSON.parse(exp));
+    if (sett) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(sett) });
+    if (prof) setUserProfile(JSON.parse(prof));
+    
+    setIsInitialized(true);
+  }, [loginId]);
 
   const setAllData = (data: any, id: string, profile?: UserProfile) => {
+    setLoginId(id);
+    localStorage.setItem('loginId', id);
+    
     if (data.transactions) {
       setTransactions(data.transactions);
-      localStorage.setItem('transactions', JSON.stringify(data.transactions));
+      localStorage.setItem(`transactions_${id}`, JSON.stringify(data.transactions));
     }
     if (data.customers) {
       setCustomers(data.customers);
-      localStorage.setItem('customers', JSON.stringify(data.customers));
+      localStorage.setItem(`customers_${id}`, JSON.stringify(data.customers));
     }
     if (data.shortList) {
       setShortList(data.shortList);
-      localStorage.setItem('shortList', JSON.stringify(data.shortList));
+      localStorage.setItem(`shortList_${id}`, JSON.stringify(data.shortList));
     }
     if (data.expenses) {
       setExpenses(data.expenses);
-      localStorage.setItem('expenses', JSON.stringify(data.expenses));
+      localStorage.setItem(`expenses_${id}`, JSON.stringify(data.expenses));
     }
     if (data.settings) {
       const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
       setSettings(newSettings);
-      localStorage.setItem('settings', JSON.stringify(newSettings));
+      localStorage.setItem(`settings_${id}`, JSON.stringify(newSettings));
     }
     if (profile) {
       setUserProfile(profile);
-      localStorage.setItem('user_profile', JSON.stringify(profile));
+      localStorage.setItem(`user_profile_${id}`, JSON.stringify(profile));
     }
-    setLoginId(id);
     setIsInitialized(true);
   };
 
   const clearData = () => {
+    if (loginId) {
+      localStorage.removeItem(`transactions_${loginId}`);
+      localStorage.removeItem(`customers_${loginId}`);
+      localStorage.removeItem(`shortList_${loginId}`);
+      localStorage.removeItem(`expenses_${loginId}`);
+      localStorage.removeItem(`settings_${loginId}`);
+      localStorage.removeItem(`user_profile_${loginId}`);
+    }
+    localStorage.removeItem('loginId');
+    localStorage.removeItem('password');
+    localStorage.removeItem('is_authenticated');
+    
     setTransactions([]);
     setCustomers([]);
     setShortList([]);
@@ -69,22 +100,17 @@ export function useStore() {
     setUserProfile(null);
     setLoginId(null);
     setIsInitialized(false);
-    localStorage.removeItem('transactions');
-    localStorage.removeItem('customers');
-    localStorage.removeItem('shortList');
-    localStorage.removeItem('expenses');
-    localStorage.removeItem('settings');
-    localStorage.removeItem('user_profile');
   };
 
   useEffect(() => {
-    if (!isInitialized) return;
-    localStorage.setItem('transactions', JSON.stringify(transactions));
-    localStorage.setItem('customers', JSON.stringify(customers));
-    localStorage.setItem('shortList', JSON.stringify(shortList));
-    localStorage.setItem('expenses', JSON.stringify(expenses));
-    localStorage.setItem('settings', JSON.stringify(settings));
-    if (userProfile) localStorage.setItem('user_profile', JSON.stringify(userProfile));
+    if (!isInitialized || !loginId) return;
+    
+    localStorage.setItem(`transactions_${loginId}`, JSON.stringify(transactions));
+    localStorage.setItem(`customers_${loginId}`, JSON.stringify(customers));
+    localStorage.setItem(`shortList_${loginId}`, JSON.stringify(shortList));
+    localStorage.setItem(`expenses_${loginId}`, JSON.stringify(expenses));
+    localStorage.setItem(`settings_${loginId}`, JSON.stringify(settings));
+    if (userProfile) localStorage.setItem(`user_profile_${loginId}`, JSON.stringify(userProfile));
 
     if (!loginId) return;
 

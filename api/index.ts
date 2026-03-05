@@ -11,10 +11,9 @@ function getDb(): Promise<any> {
     if (db) return resolve(db);
     
     try {
-      const isVercel = !!process.env.VERCEL;
-      const dbPath = isVercel 
-        ? path.join('/tmp', 'app_data.db') 
-        : path.resolve(process.cwd(), 'app_data.db');
+      // Use a persistent path in the current directory
+      const dbPath = path.resolve(process.cwd(), 'app_data.db');
+      console.log('Database path:', dbPath);
         
       const database = new sqlite3.Database(dbPath, (err) => {
         if (err) {
@@ -27,20 +26,19 @@ function getDb(): Promise<any> {
             CREATE TABLE IF NOT EXISTS users (
               loginId TEXT PRIMARY KEY,
               password TEXT,
-              data TEXT
+              data TEXT,
+              name TEXT,
+              shopName TEXT,
+              address TEXT,
+              profilePic TEXT,
+              githubId TEXT,
+              githubUsername TEXT
             )
-          `);
-
-          // Add columns if they don't exist
-          const columns = ['name', 'shopName', 'address', 'profilePic', 'githubId', 'githubUsername'];
-          columns.forEach(col => {
-            database.run(`ALTER TABLE users ADD COLUMN ${col} TEXT`, (err) => {
-              // Ignore error if column already exists
-            });
+          `, (err) => {
+            if (err) console.error('Table creation error:', err);
+            db = database;
+            resolve(db);
           });
-          
-          db = database;
-          resolve(db);
         });
       });
     } catch (err) {

@@ -19,7 +19,7 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
   const [profileShopName, setProfileShopName] = useState(userProfile?.shopName || '');
   const [profileAddress, setProfileAddress] = useState(userProfile?.address || '');
   const [profileMobile, setProfileMobile] = useState(userProfile?.mobile || '');
-  const [profilePassword, setProfilePassword] = useState(sessionStorage.getItem('password') || '');
+  const [profilePassword, setProfilePassword] = useState(localStorage.getItem('password') || '');
   const [profilePic, setProfilePic] = useState(userProfile?.profilePic || '');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,7 +55,7 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
     e.preventDefault();
     setIsUpdatingProfile(true);
     try {
-      const currentLoginId = sessionStorage.getItem('loginId');
+      const currentLoginId = localStorage.getItem('loginId');
       const res = await fetch('/api/update-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,8 +72,8 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
       const data = await res.json();
       if (data.success) {
         onUpdateProfile(data.profile);
-        sessionStorage.setItem('loginId', profileMobile);
-        sessionStorage.setItem('password', profilePassword);
+        localStorage.setItem('loginId', profileMobile);
+        localStorage.setItem('password', profilePassword);
         alert('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
       } else {
         alert(data.error || 'প্রোফাইল আপডেট ব্যর্থ হয়েছে');

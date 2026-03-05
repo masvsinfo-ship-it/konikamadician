@@ -27,7 +27,7 @@ export default function App() {
   const [viewingCustomerId, setViewingCustomerId] = useState<string | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('is_authenticated') === 'true';
+    return localStorage.getItem('is_authenticated') === 'true';
   });
   const [isLoading, setIsLoading] = useState(true);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(capturedPrompt);
@@ -94,7 +94,7 @@ export default function App() {
                 name: userProfile.name,
                 shopName: userProfile.shopName,
                 address: userProfile.address,
-                password: sessionStorage.getItem('password'),
+                password: localStorage.getItem('password'),
                 profilePic: userProfile.profilePic,
                 githubId,
                 githubUsername
@@ -118,8 +118,8 @@ export default function App() {
       setShowSplash(false);
     }, 2500);
 
-    const storedLoginId = sessionStorage.getItem('loginId');
-    const storedPassword = sessionStorage.getItem('password');
+    const storedLoginId = localStorage.getItem('loginId');
+    const storedPassword = localStorage.getItem('password');
     
     const initApp = async () => {
       try {
@@ -139,11 +139,13 @@ export default function App() {
             const data = await res.json();
             if (data.success) {
               setAllData(data.data, storedLoginId, data.profile);
-              setIsAuthenticated(true);
+              localStorage.setItem('is_authenticated', 'true');
             } else {
               // If credentials failed, but we have local data, we might still want to show it
               // but for security, let's clear if the server explicitly says invalid
-              sessionStorage.clear();
+              localStorage.removeItem('loginId');
+              localStorage.removeItem('password');
+              localStorage.removeItem('is_authenticated');
               setIsAuthenticated(false);
             }
           }
@@ -300,16 +302,18 @@ export default function App() {
 
   const handleLogin = (data: any, loginId: string, pass: string, profile?: any) => {
     setAllData(data, loginId, profile);
-    sessionStorage.setItem('is_authenticated', 'true');
-    sessionStorage.setItem('loginId', loginId);
-    sessionStorage.setItem('password', pass);
+    localStorage.setItem('is_authenticated', 'true');
+    localStorage.setItem('loginId', loginId);
+    localStorage.setItem('password', pass);
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
     if (confirm('আপনি কি লগআউট করতে চান?')) {
       clearData();
-      sessionStorage.clear();
+      localStorage.removeItem('is_authenticated');
+      localStorage.removeItem('loginId');
+      localStorage.removeItem('password');
       setIsAuthenticated(false);
     }
   };

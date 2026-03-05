@@ -146,15 +146,22 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
       } else {
         if (serverStatus === 'offline') {
           // Offline Login Logic
-          const savedProfile = localStorage.getItem('user_profile');
-          const savedLoginId = sessionStorage.getItem('loginId') || (savedProfile ? JSON.parse(savedProfile).mobile : null);
-          const savedPassword = sessionStorage.getItem('password');
+          const savedLoginId = localStorage.getItem('loginId');
+          const savedPassword = localStorage.getItem('password');
+          const savedProfile = localStorage.getItem(`user_profile_${loginId}`);
 
           if (savedProfile && savedLoginId === loginId && (savedPassword === password || !savedPassword)) {
             const profile = JSON.parse(savedProfile);
-            onLogin({}, loginId, password, profile);
+            const savedData = {
+              transactions: JSON.parse(localStorage.getItem(`transactions_${loginId}`) || '[]'),
+              customers: JSON.parse(localStorage.getItem(`customers_${loginId}`) || '[]'),
+              shortList: JSON.parse(localStorage.getItem(`shortList_${loginId}`) || '[]'),
+              expenses: JSON.parse(localStorage.getItem(`expenses_${loginId}`) || '[]'),
+              settings: JSON.parse(localStorage.getItem(`settings_${loginId}`) || '{}'),
+            };
+            onLogin(savedData, loginId, password, profile);
             return;
-          } else if (savedProfile && savedLoginId === loginId) {
+          } else if (savedLoginId === loginId) {
             setError('পাসওয়ার্ড ভুল (অফলাইন মোড)');
             setIsLoading(false);
             return;
