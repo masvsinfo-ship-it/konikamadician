@@ -1,51 +1,48 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import sqlite3 from 'sqlite3';
+import Database from 'better-sqlite3';
+import fs from 'fs';
 
-// Lazy load Database to avoid issues on environments where it might fail to load
+// Database initialization
 let db: any;
 
-function getDb(): Promise<any> {
-  return new Promise((resolve, reject) => {
-    if (db) return resolve(db);
+function getDb() {
+  if (db) return db;
+  
+  try {
+    const dbPath = path.resolve(process.cwd(), 'app_data.db');
+    console.log('Database path:', dbPath);
     
-    try {
-      // Use a persistent path in the current directory
-      const dbPath = path.resolve(process.cwd(), 'app_data.db');
-      console.log('Database path:', dbPath);
-        
-      const database = new sqlite3.Database(dbPath, (err) => {
-        if (err) {
-          console.error('Database connection error:', err);
-          return resolve(null);
-        }
-        
-        database.serialize(() => {
-          database.run(`
-            CREATE TABLE IF NOT EXISTS users (
-              loginId TEXT PRIMARY KEY,
-              password TEXT,
-              data TEXT,
-              name TEXT,
-              shopName TEXT,
-              address TEXT,
-              profilePic TEXT,
-              githubId TEXT,
-              githubUsername TEXT
-            )
-          `, (err) => {
-            if (err) console.error('Table creation error:', err);
-            db = database;
-            resolve(db);
-          });
-        });
-      });
-    } catch (err) {
-      console.error('Database initialization failed:', err);
-      resolve(null);
+    // Ensure the directory is writable
+    const dir = path.dirname(dbPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
-  });
+
+    db = new Database(dbPath);
+    
+    // Create tables
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        loginId TEXT PRIMARY KEY,
+        password TEXT,
+        data TEXT,
+        name TEXT,
+        shopName TEXT,
+        address TEXT,
+        profilePic TEXT,
+        githubId TEXT,
+        githubUsername TEXT
+      )
+    `);
+    
+    console.log('Database initialized successfully');
+    return db;
+  } catch (err) {
+    console.error('Database initialization failed:', err);
+    return null;
+  }
 }
 
 const app = express();
@@ -54,26 +51,32 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-app.get('/api/health', async (req, res) => {
-  const database = await getDb();
-  res.json({ status: 'ok', db: !!database, env: process.env.NODE_ENV });
+app.get('/api/health', (req, res) => {
+  const database = getDb();
+  res.json({ 
+    status: 'ok', 
+    db: !!database, 
+    dbPath: path.resolve(process.cwd(), 'app_data.db')
+  });
 });
 
 app.get('/api/ping', (req, res) => {
   res.send('pong');
 });
 
-app.post('/api/login', async (req, res) => {
-  const database = await getDb();
+app.post('/api/login', (req, res) => {
+  const database = getDb();
   if (!database) {
-    return res.status(500).json({ error: 'Database is not initialized. Please try again later.' });
+    return res.status(500).json({ error: 'ডাটাবেস কানেকশন পাওয়া যায়নি। দয়া করে সার্ভার চেক করুন।' });
   }
+  
   const { loginId, password } = req.body;
   
-  database.get('SELECT * FROM users WHERE loginId = ?', [loginId], (err, user: any) => {
-    if (err) return res.status(500).json({ error: 'Database error' });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    if (user.password !== password) return res.status(401).json({ error: 'Invalid password' });
+  try {
+    const user = database.prepare('SELECT * FROM users WHERE loginId = ?').get(loginId);
+    
+    if (!user) return res.status(404).json({ error: 'এই মোবাইল নাম্বার দিয়ে কোনো একাউন্ট পাওয়া যায়নি' });
+    if (user.password !== password) return res.status(401).json({ error: 'ভুল পাসওয়ার্ড' });
     
     res.json({ 
       success: true, 
@@ -88,43 +91,51 @@ app.post('/api/login', async (req, res) => {
         githubUsername: user.githubUsername
       }
     });
-  });
+  } catch (err: any) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'লগইন করার সময় সমস্যা হয়েছে: ' + err.message });
+  }
 });
 
-app.post('/api/register', async (req, res) => {
-  const database = await getDb();
+app.post('/api/register', (req, res) => {
+  const database = getDb();
   if (!database) {
-    return res.status(500).json({ error: 'Database is not initialized. Please try again later.' });
+    return res.status(500).json({ error: 'ডাটাবেস কানেকশন পাওয়া যায়নি।' });
   }
+  
   const { loginId, password, name, shopName, address } = req.body;
   if (!loginId || !password || !name || !shopName || !address) {
-    return res.status(400).json({ error: 'Name, Shop Name, Address, Mobile Number and password are required' });
+    return res.status(400).json({ error: 'সবগুলো তথ্য প্রদান করা আবশ্যক' });
   }
   
-  database.run(
-    'INSERT INTO users (loginId, password, name, shopName, address, data) VALUES (?, ?, ?, ?, ?, ?)',
-    [loginId, password, name, shopName, address, '{}'],
-    function(err) {
-      if (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-          return res.status(400).json({ error: 'Mobile Number already exists' });
-        }
-        return res.status(500).json({ error: 'Registration failed' });
-      }
-      res.json({ success: true, profile: { name, shopName, address, mobile: loginId } });
+  try {
+    const stmt = database.prepare('INSERT INTO users (loginId, password, name, shopName, address, data) VALUES (?, ?, ?, ?, ?, ?)');
+    stmt.run(loginId, password, name, shopName, address, '{}');
+    
+    res.json({ 
+      success: true, 
+      profile: { name, shopName, address, mobile: loginId } 
+    });
+  } catch (err: any) {
+    if (err.message.includes('UNIQUE constraint failed')) {
+      return res.status(400).json({ error: 'এই মোবাইল নাম্বারটি ইতিমধ্যে নিবন্ধিত' });
     }
-  );
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'রেজিস্ট্রেশন করার সময় সমস্যা হয়েছে: ' + err.message });
+  }
 });
 
-app.post('/api/recover-password', async (req, res) => {
-  const database = await getDb();
+app.post('/api/recover-password', (req, res) => {
+  const database = getDb();
   if (!database) {
-    return res.status(500).json({ error: 'Database is not initialized. Please try again later.' });
+    return res.status(500).json({ error: 'Database is not initialized.' });
   }
+  
   const { loginId, lastTransactionAmount } = req.body;
   
-  database.get('SELECT * FROM users WHERE loginId = ?', [loginId], (err, user: any) => {
-    if (err || !user) return res.status(404).json({ error: 'User not found' });
+  try {
+    const user = database.prepare('SELECT * FROM users WHERE loginId = ?').get(loginId);
+    if (!user) return res.status(404).json({ error: 'ইউজার পাওয়া যায়নি' });
     
     const data = JSON.parse(user.data || '{}');
     const transactions = data.transactions || [];
@@ -136,55 +147,79 @@ app.post('/api/recover-password', async (req, res) => {
     } else {
       res.status(400).json({ error: 'শেষ লেনদেনের পরিমাণ মেলেনি' });
     }
-  });
+  } catch (err: any) {
+    res.status(500).json({ error: 'পাসওয়ার্ড উদ্ধারে সমস্যা হয়েছে: ' + err.message });
+  }
 });
 
-app.post('/api/sync', async (req, res) => {
-  const database = await getDb();
+app.post('/api/sync', (req, res) => {
+  const database = getDb();
   if (!database) {
-    return res.status(500).json({ error: 'Database is not initialized. Please try again later.' });
+    return res.status(500).json({ error: 'Database is not initialized.' });
   }
+  
   const { loginId, data } = req.body;
   if (!loginId) return res.status(400).json({ error: 'Login ID is required' });
   
-  database.run('UPDATE users SET data = ? WHERE loginId = ?', [JSON.stringify(data), loginId], (err) => {
-    if (err) return res.status(500).json({ error: 'Sync failed' });
+  try {
+    const stmt = database.prepare('UPDATE users SET data = ? WHERE loginId = ?');
+    stmt.run(JSON.stringify(data), loginId);
     res.json({ success: true });
-  });
+  } catch (err: any) {
+    res.status(500).json({ error: 'সিঙ্ক করতে সমস্যা হয়েছে: ' + err.message });
+  }
 });
 
-app.post('/api/update-profile', async (req, res) => {
-  const database = await getDb();
+app.post('/api/update-profile', (req, res) => {
+  const database = getDb();
   if (!database) {
-    return res.status(500).json({ error: 'Database is not initialized. Please try again later.' });
+    return res.status(500).json({ error: 'Database is not initialized.' });
   }
+  
   const { currentLoginId, newLoginId, name, shopName, address, password, profilePic, githubId, githubUsername } = req.body;
   
   try {
-    database.get('SELECT loginId FROM users WHERE loginId = ?', [newLoginId], (err, exists) => {
-      if (currentLoginId !== newLoginId && exists) {
-        return res.status(400).json({ error: 'This mobile number is already registered' });
+    // Check if new mobile number is already taken by someone else
+    if (currentLoginId !== newLoginId) {
+      const exists = database.prepare('SELECT loginId FROM users WHERE loginId = ?').get(newLoginId);
+      if (exists) {
+        return res.status(400).json({ error: 'এই মোবাইল নাম্বারটি ইতিমধ্যে অন্য কেউ ব্যবহার করছেন' });
       }
-      
-      database.run(
-        `UPDATE users SET loginId = ?, name = ?, shopName = ?, address = ?, password = ?, profilePic = ?, githubId = ?, githubUsername = ? WHERE loginId = ?`,
-        [newLoginId, name, shopName, address, password, profilePic, githubId, githubUsername, currentLoginId],
-        (err) => {
-          if (err) return res.status(500).json({ error: 'Failed to update profile' });
-          res.json({ success: true, profile: { name, shopName, address, mobile: newLoginId, profilePic, githubId, githubUsername } });
-        }
-      );
+    }
+
+    const stmt = database.prepare(`
+      UPDATE users 
+      SET loginId = ?, name = ?, shopName = ?, address = ?, password = ?, profilePic = ?, githubId = ?, githubUsername = ?
+      WHERE loginId = ?
+    `);
+    
+    stmt.run(newLoginId, name, shopName, address, password, profilePic, githubId, githubUsername, currentLoginId);
+    
+    res.json({ 
+      success: true, 
+      profile: { 
+        name, 
+        shopName, 
+        address, 
+        mobile: newLoginId, 
+        profilePic,
+        githubId,
+        githubUsername
+      } 
     });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to update profile' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'প্রোফাইল আপডেট করতে সমস্যা হয়েছে: ' + err.message });
   }
 });
 
 // GitHub OAuth Routes
 app.get('/api/auth/github/url', (req, res) => {
+  if (!process.env.GITHUB_CLIENT_ID) {
+    return res.status(400).json({ error: 'GitHub Client ID is not configured' });
+  }
   const redirectUri = `${process.env.APP_URL}/api/auth/github/callback`;
   const params = new URLSearchParams({
-    client_id: process.env.GITHUB_CLIENT_ID!,
+    client_id: process.env.GITHUB_CLIENT_ID,
     redirect_uri: redirectUri,
     scope: 'read:user user:email gist',
   });
@@ -250,10 +285,8 @@ app.all('/api/*', (req, res) => {
   res.status(404).json({ error: 'API route not found' });
 });
 
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
 
 export default app;
