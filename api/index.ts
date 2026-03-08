@@ -32,6 +32,7 @@ async function initDb(): Promise<boolean> {
     } catch (err: any) {
       console.error('MongoDB connection failed:', err);
       dbError = 'MongoDB Error: ' + err.message;
+      // Continue to fallback
     }
   }
 
@@ -45,18 +46,24 @@ async function initDb(): Promise<boolean> {
     } catch (err: any) {
       console.error('Postgres connection failed:', err);
       dbError = 'Postgres Error: ' + err.message;
+      // Continue to fallback
     }
   }
 
-  // 3. Fallback to SQLite (Local)
+  // 3. Fallback to SQLite (Local or Vercel /tmp)
   if (db) return true;
   try {
-    const dbPath = path.resolve(process.cwd(), 'dokaner_khata_v3.db');
+    const dbPath = process.env.VERCEL 
+      ? path.join('/tmp', 'dokaner_khata_v3.db') 
+      : path.resolve(process.cwd(), 'dokaner_khata_v3.db');
+      
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    
     db = await open({ filename: dbPath, driver: sqlite3.Database });
     await db.run('PRAGMA journal_mode = DELETE');
     await db.exec(`CREATE TABLE IF NOT EXISTS users (loginId TEXT PRIMARY KEY, password TEXT, data TEXT, name TEXT, shopName TEXT, address TEXT, profilePic TEXT)`);
+    
     dbType = 'sqlite';
     dbError = null;
     return true;
@@ -85,10 +92,26 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Request logging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
 // Routes
 app.get('/api/health', async (req, res) => {
   const ready = await initDb();
-  res.json({ status: 'ok', db: ready, type: dbType, error: dbError });
+  res.json({ 
+    status: 'ok', 
+    db: ready, 
+    type: dbType, 
+    error: dbError,
+    env: {
+      hasMongo: !!process.env.MONGODB_URI,
+      hasPostgres: !!process.env.POSTGRES_URL,
+      isVercel: !!process.env.VERCEL
+    }
+  });
 });
 
 app.post('/api/login', async (req, res) => {
@@ -98,12 +121,14 @@ app.post('/api/login', async (req, res) => {
     const user = await getUser(loginId);
     if (!user) return res.status(404).json({ error: 'এই মোবাইল নাম্বার দিয়ে কোনো একাউন্ট পাওয়া যায়নি' });
     if (user.password !== password) return res.status(401).json({ error: 'ভুল পাসওয়ার্ড' });
+    
     res.json({ 
       success: true, 
       data: typeof user.data === 'string' ? JSON.parse(user.data || '{}') : (user.data || {}),
       profile: { name: user.name, shopName: user.shopName, address: user.address, mobile: user.loginId, profilePic: user.profilePic } 
     });
   } catch (err: any) {
+    console.error('Login error:', err);
     res.status(500).json({ error: 'লগইন এরর: ' + err.message });
   }
 });
@@ -124,6 +149,7 @@ app.post('/api/register', async (req, res) => {
     }
     res.json({ success: true, profile: { name, shopName, address, mobile: loginId } });
   } catch (err: any) {
+    console.error('Registration error:', err);
     if (err.message.includes('UNIQUE') || err.message.includes('duplicate')) return res.status(400).json({ error: 'এই মোবাইল নাম্বারটি ইতিমধ্যে নিবন্ধিত' });
     res.status(500).json({ error: 'রেজিস্ট্রেশন এরর: ' + err.message });
   }
@@ -142,6 +168,7 @@ app.post('/api/sync', async (req, res) => {
     }
     res.json({ success: true });
   } catch (err: any) {
+    console.error('Sync error:', err);
     res.status(500).json({ error: 'সিঙ্ক এরর: ' + err.message });
   }
 });
@@ -163,6 +190,7 @@ app.post('/api/update-profile', async (req, res) => {
     }
     res.json({ success: true, profile: { name, shopName, address, mobile: newLoginId, profilePic } });
   } catch (err: any) {
+    console.error('Update profile error:', err);
     res.status(500).json({ error: 'প্রোফাইল আপডেট এরর: ' + err.message });
   }
 });
@@ -179,11 +207,18 @@ app.post('/api/recover-password', async (req, res) => {
     if (transactions[0].amount.toString() === lastTransactionAmount.toString()) res.json({ success: true, password: user.password });
     else res.status(400).json({ error: 'শেষ লেনদেনের পরিমাণ মেলেনি' });
   } catch (err: any) {
+    console.error('Recover password error:', err);
     res.status(500).json({ error: 'পাসওয়ার্ড উদ্ধার এরর: ' + err.message });
   }
 });
 
 app.get('/api/ping', (req, res) => res.send('pong'));
+
+// Global error handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'সার্ভারে অভ্যন্তরীণ সমস্যা: ' + err.message });
+});
 
 async function startServer() {
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
