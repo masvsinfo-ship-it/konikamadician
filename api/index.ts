@@ -16,7 +16,10 @@ let dbError: string | null = null;
 async function initDb(retry = true): Promise<Database | null> {
   if (db) return db;
   
-  const dbPath = path.resolve(process.cwd(), 'dokaner_khata_v3.db');
+  const dbPath = process.env.VERCEL 
+    ? path.join('/tmp', 'dokaner_khata_v3.db') 
+    : path.resolve(process.cwd(), 'dokaner_khata_v3.db');
+  
   console.log('Initializing database at:', dbPath);
   
   try {
