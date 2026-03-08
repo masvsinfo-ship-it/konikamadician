@@ -39,18 +39,27 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [lastError, setLastError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkServer = async () => {
       try {
         const res = await fetch('/api/health');
-        setServerStatus(res.ok ? 'online' : 'offline');
-      } catch (e) {
+        const data = await res.json();
+        if (res.ok && data.status === 'ok' && data.db) {
+          setServerStatus('online');
+          setLastError(null);
+        } else {
+          setServerStatus('offline');
+          setLastError(data.error || 'Database connection failed');
+        }
+      } catch (e: any) {
         setServerStatus('offline');
+        setLastError(e.message || 'Network error');
       }
     };
     checkServer();
-    const interval = setInterval(checkServer, 30000);
+    const interval = setInterval(checkServer, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -216,12 +225,19 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
                 </span>
               </div>
               {serverStatus === 'offline' && (
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="text-[8px] font-bold text-emerald-600 underline uppercase tracking-widest"
-                >
-                  Retry Connection
-                </button>
+                <div className="flex flex-col items-end">
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="text-[8px] font-bold text-emerald-600 underline uppercase tracking-widest"
+                  >
+                    Retry Connection
+                  </button>
+                  {lastError && (
+                    <span className="text-[8px] text-red-500 font-medium max-w-[150px] text-right truncate">
+                      {lastError}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 

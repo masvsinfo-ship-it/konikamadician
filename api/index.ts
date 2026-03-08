@@ -14,13 +14,13 @@ async function startServer() {
   let db: Database | null = null;
   let dbError: string | null = null;
 
-  async function initDb() {
+  async function initDb(retry = true): Promise<Database | null> {
     if (db) return db;
     
+    const dbPath = path.resolve(process.cwd(), 'dokaner_khata_v3.db');
+    console.log('Initializing database at:', dbPath);
+    
     try {
-      const dbPath = path.resolve(process.cwd(), 'app_data.db');
-      console.log('Initializing database at:', dbPath);
-      
       const dir = path.dirname(dbPath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -30,6 +30,9 @@ async function startServer() {
         filename: dbPath,
         driver: sqlite3.Database
       });
+
+      // Disable WAL mode to prevent corruption in this environment
+      await db.run('PRAGMA journal_mode = DELETE');
 
       await db.exec(`
         CREATE TABLE IF NOT EXISTS users (
@@ -51,6 +54,13 @@ async function startServer() {
     } catch (err: any) {
       console.error('Database initialization failed:', err);
       dbError = err.message;
+      
+      if (retry && err.message.includes('malformed')) {
+        console.log('Malformed database detected, deleting and recreating...');
+        if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
+        db = null;
+        return initDb(false);
+      }
       return null;
     }
   }
@@ -60,6 +70,7 @@ async function startServer() {
 
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   app.get('/api/health', async (req, res) => {
     const database = await initDb();
@@ -67,7 +78,7 @@ async function startServer() {
       status: 'ok', 
       db: !!database, 
       error: dbError,
-      dbPath: path.resolve(process.cwd(), 'app_data.db')
+      dbPath: path.resolve(process.cwd(), 'dokaner_khata_v3.db')
     });
   });
 
@@ -343,8 +354,17 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  // Cleanup on exit
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(async () => {
+      if (db) await db.close();
+      console.log('HTTP server closed');
+    });
   });
 }
 

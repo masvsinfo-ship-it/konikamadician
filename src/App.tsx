@@ -125,15 +125,21 @@ export default function App() {
     const storedLoginId = localStorage.getItem('loginId');
     const storedPassword = localStorage.getItem('password');
     
-    const initApp = async () => {
+    const initApp = async (retries = 3) => {
       try {
-        // Wait a bit for server to be ready
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait for server to be ready
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Check if server is reachable
         const healthRes = await fetch('/api/health').catch(() => null);
         
         if (healthRes && healthRes.ok) {
+          const healthData = await healthRes.json();
+          if (!healthData.db && retries > 0) {
+            console.warn('Server up but DB not ready, retrying...');
+            return initApp(retries - 1);
+          }
+
           if (storedLoginId && storedPassword) {
             const res = await fetch('/api/login', {
               method: 'POST',
@@ -145,27 +151,24 @@ export default function App() {
               setAllData(data.data, storedLoginId, data.profile);
               localStorage.setItem('is_authenticated', 'true');
             } else {
-              // If credentials failed, but we have local data, we might still want to show it
-              // but for security, let's clear if the server explicitly says invalid
               localStorage.removeItem('loginId');
               localStorage.removeItem('password');
               localStorage.removeItem('is_authenticated');
               setIsAuthenticated(false);
             }
           }
+        } else if (retries > 0) {
+          console.warn('Server not reachable, retrying...', retries);
+          return initApp(retries - 1);
         } else {
-          console.warn('Server is offline, using local data');
-          // If server is offline, we check if we have local data to show
+          console.warn('Server is offline after retries, using local data');
           if (storedLoginId && storedPassword) {
             setIsAuthenticated(true);
-            // setAllData will be called with local data automatically because of the initial state in useStore
-            // but we need to mark it as initialized
             setAllData({}, storedLoginId, userProfile || undefined);
           }
         }
       } catch (err) {
         console.error('Initialization error:', err);
-        // Fallback to local data if authenticated before
         if (storedLoginId && storedPassword) {
           setIsAuthenticated(true);
           setAllData({}, storedLoginId, userProfile || undefined);
