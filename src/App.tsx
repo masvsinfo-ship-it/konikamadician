@@ -71,53 +71,10 @@ export default function App() {
     editExpense,
     deleteExpense,
     resetAllData,
-    restoreFromGithub,
   } = useStore();
 
   // Notification Logic
   useEffect(() => {
-    const handleOAuthMessage = async (event: MessageEvent) => {
-      const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
-        return;
-      }
-
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.provider === 'github') {
-        const { githubId, githubUsername, accessToken } = event.data;
-        if (userProfile) {
-          try {
-            // Store token for sync
-            localStorage.setItem(`github_token_${userProfile.mobile}`, accessToken);
-            
-            const res = await fetch('/api/update-profile', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                currentLoginId: userProfile.mobile,
-                newLoginId: userProfile.mobile,
-                name: userProfile.name,
-                shopName: userProfile.shopName,
-                address: userProfile.address,
-                password: localStorage.getItem('password'),
-                profilePic: userProfile.profilePic,
-                githubId,
-                githubUsername
-              })
-            });
-            const data = await res.json();
-            if (data.success) {
-              setUserProfile(data.profile);
-              alert('GitHub অ্যাকাউন্ট সফলভাবে যুক্ত হয়েছে!');
-            }
-          } catch (err) {
-            console.error('Failed to update profile with GitHub info:', err);
-          }
-        }
-      }
-    };
-
-    window.addEventListener('message', handleOAuthMessage);
-    
     const splashTimer = setTimeout(() => {
       setShowSplash(false);
     }, 2500);
@@ -259,7 +216,6 @@ export default function App() {
     return () => {
       clearTimeout(splashTimer);
       clearInterval(interval);
-      window.removeEventListener('message', handleOAuthMessage);
     };
   }, [customers, transactions, expenses, userProfile]);
 
@@ -427,7 +383,6 @@ export default function App() {
             onUpdateSettings={setSettings}
             onUpdateProfile={setUserProfile}
             onResetData={resetAllData}
-            onRestoreFromGithub={restoreFromGithub}
           />
         );
       default:

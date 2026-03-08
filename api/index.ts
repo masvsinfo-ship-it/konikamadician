@@ -42,9 +42,7 @@ async function startServer() {
           name TEXT,
           shopName TEXT,
           address TEXT,
-          profilePic TEXT,
-          githubId TEXT,
-          githubUsername TEXT
+          profilePic TEXT
         )
       `);
       
@@ -71,6 +69,12 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+  // Request logging
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+  });
 
   app.get('/api/health', async (req, res) => {
     const database = await initDb();
@@ -117,9 +121,7 @@ async function startServer() {
           shopName: user.shopName || 'কনিকা মেডিসিন কর্ণার', 
           address: user.address || '', 
           mobile: user.loginId, 
-          profilePic: user.profilePic,
-          githubId: user.githubId,
-          githubUsername: user.githubUsername
+          profilePic: user.profilePic
         }
       });
     } catch (err: any) {
@@ -212,7 +214,7 @@ async function startServer() {
       return res.status(500).json({ error: 'Database connection failed.' });
     }
     
-    const { currentLoginId, newLoginId, name, shopName, address, password, profilePic, githubId, githubUsername } = req.body;
+    const { currentLoginId, newLoginId, name, shopName, address, password, profilePic } = req.body;
     
     try {
       if (currentLoginId !== newLoginId) {
@@ -224,9 +226,9 @@ async function startServer() {
 
       await database.run(`
         UPDATE users 
-        SET loginId = ?, name = ?, shopName = ?, address = ?, password = ?, profilePic = ?, githubId = ?, githubUsername = ?
+        SET loginId = ?, name = ?, shopName = ?, address = ?, password = ?, profilePic = ?
         WHERE loginId = ?
-      `, newLoginId, name, shopName, address, password, profilePic, githubId, githubUsername, currentLoginId);
+      `, newLoginId, name, shopName, address, password, profilePic, currentLoginId);
       
       res.json({ 
         success: true, 
@@ -235,9 +237,7 @@ async function startServer() {
           shopName, 
           address, 
           mobile: newLoginId, 
-          profilePic,
-          githubId,
-          githubUsername
+          profilePic
         } 
       });
     } catch (err: any) {
@@ -261,75 +261,6 @@ async function startServer() {
     } catch (err: any) {
       console.error('Database test failed:', err);
       res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // GitHub OAuth Routes
-  app.get('/api/auth/github/url', (req, res) => {
-    if (!process.env.GITHUB_CLIENT_ID) {
-      return res.status(400).json({ error: 'GitHub Client ID is not configured' });
-    }
-    const redirectUri = `${process.env.APP_URL}/api/auth/github/callback`;
-    const params = new URLSearchParams({
-      client_id: process.env.GITHUB_CLIENT_ID,
-      redirect_uri: redirectUri,
-      scope: 'read:user user:email gist',
-    });
-    const authUrl = `https://github.com/login/oauth/authorize?${params}`;
-    res.json({ url: authUrl });
-  });
-
-  app.get('/api/auth/github/callback', async (req, res) => {
-    const { code } = req.query;
-    if (!code) return res.status(400).send('Code is missing');
-
-    try {
-      const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          client_id: process.env.GITHUB_CLIENT_ID,
-          client_secret: process.env.GITHUB_CLIENT_SECRET,
-          code,
-        }),
-      });
-
-      const tokenData = await tokenRes.json() as any;
-      if (tokenData.error) throw new Error(tokenData.error_description || tokenData.error);
-
-      const userRes = await fetch('https://api.github.com/user', {
-        headers: {
-          'Authorization': `token ${tokenData.access_token}`,
-          'Accept': 'application/json',
-          'User-Agent': 'Konika-Medicine-Corner'
-        },
-      });
-      const userData = await userRes.json() as any;
-
-      res.send(`
-        <html>
-          <body>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({ 
-                  type: 'OAUTH_AUTH_SUCCESS', 
-                  provider: 'github',
-                  githubId: '${userData.id}',
-                  githubUsername: '${userData.login}',
-                  accessToken: '${tokenData.access_token}'
-                }, '*');
-                window.close();
-              } else {
-                window.location.href = '/';
-              }
-            </script>
-            <p>Authentication successful. This window should close automatically.</p>
-          </body>
-        </html>
-      `);
-    } catch (error: any) {
-      console.error('GitHub OAuth error:', error);
-      res.status(500).send(`Authentication failed: ${error.message}`);
     }
   });
 

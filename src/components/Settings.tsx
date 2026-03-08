@@ -9,10 +9,9 @@ interface SettingsProps {
   onUpdateSettings: (settings: AppSettings) => void;
   onUpdateProfile: (profile: UserProfile) => void;
   onResetData: () => void;
-  onRestoreFromGithub: () => void;
 }
 
-export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProfile, onResetData, onRestoreFromGithub }: SettingsProps) {
+export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProfile, onResetData }: SettingsProps) {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   
   // Profile State
@@ -86,18 +85,6 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
     }
   };
 
-  const handleGitHubConnect = async () => {
-    try {
-      const res = await fetch('/api/auth/github/url');
-      const { url } = await res.json();
-      window.open(url, 'github_oauth', 'width=600,height=700');
-    } catch (err) {
-      alert('GitHub কানেক্ট করতে সমস্যা হয়েছে।');
-    }
-  };
-
-  const isGitHubConnected = userProfile?.githubId && localStorage.getItem(`github_token_${userProfile.mobile}`);
-
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <Card>
@@ -107,43 +94,6 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-8 p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${isGitHubConnected ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
-                  <Github className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900">GitHub স্টোরেজ</h3>
-                  <p className="text-xs text-slate-500">আপনার তথ্য GitHub-এ ব্যাকআপ রাখুন</p>
-                </div>
-              </div>
-              {isGitHubConnected ? (
-                <div className="flex gap-2">
-                  <button
-                    onClick={onRestoreFromGithub}
-                    className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-1"
-                  >
-                    <Upload className="h-3 w-3 rotate-180" />
-                    রিস্টোর
-                  </button>
-                  <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-md">
-                    <CheckCircle2 className="h-3 w-3" />
-                    কানেক্টেড
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={handleGitHubConnect}
-                  className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors flex items-center gap-2"
-                >
-                  <Github className="h-4 w-4" />
-                  কানেক্ট করুন
-                </button>
-              )}
-            </div>
-          </div>
-
           <form onSubmit={handleProfileUpdate} className="space-y-6">
             <div className="flex flex-col items-center justify-center space-y-4">
               <div className="relative">
@@ -223,79 +173,6 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
                   required
                 />
               </div>
-            </div>
-
-            <div className="pt-4 border-t space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Github className="h-4 w-4" /> সোশ্যাল অ্যাকাউন্ট
-              </h3>
-              
-              {userProfile?.githubId ? (
-                <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-emerald-100 p-2 rounded-full">
-                      <Github className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">GitHub যুক্ত আছে</p>
-                      <p className="text-xs text-emerald-600">ইউজারনাম: {userProfile.githubUsername}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (window.confirm('আপনি কি নিশ্চিত যে আপনি GitHub অ্যাকাউন্টটি ডিসকানেক্ট করতে চান?')) {
-                          try {
-                            const res = await fetch('/api/update-profile', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                currentLoginId: userProfile.mobile,
-                                newLoginId: userProfile.mobile,
-                                name: userProfile.name,
-                                shopName: userProfile.shopName,
-                                address: userProfile.address,
-                                password: sessionStorage.getItem('password'),
-                                profilePic: userProfile.profilePic,
-                                githubId: null,
-                                githubUsername: null
-                              })
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                              onUpdateProfile(data.profile);
-                              alert('GitHub অ্যাকাউন্ট সফলভাবে ডিসকানেক্ট হয়েছে।');
-                            }
-                          } catch (err) {
-                            alert('ডিসকানেক্ট করতে সমস্যা হয়েছে।');
-                          }
-                        }
-                      }}
-                      className="text-xs font-bold text-red-500 hover:text-red-600 underline"
-                    >
-                      সরিয়ে ফেলুন
-                    </button>
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const res = await fetch('/api/auth/github/url');
-                      const { url } = await res.json();
-                      window.open(url, 'github_oauth', 'width=600,height=700');
-                    } catch (err) {
-                      alert('GitHub কানেক্ট করতে সমস্যা হয়েছে।');
-                    }
-                  }}
-                  className="w-full flex items-center justify-center gap-3 bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-all"
-                >
-                  <Github className="h-5 w-5" /> GitHub অ্যাকাউন্ট যুক্ত করুন
-                </button>
-              )}
             </div>
 
             <div className="flex justify-end">

@@ -43,8 +43,6 @@ export interface UserProfile {
   address?: string;
   mobile: string;
   profilePic?: string;
-  githubId?: string;
-  githubUsername?: string;
 }
 
 export interface AppSettings {

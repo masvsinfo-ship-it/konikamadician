@@ -43,10 +43,17 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
 
   useEffect(() => {
     const checkServer = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       try {
-        const res = await fetch('/api/health');
+        const res = await fetch('/api/health', { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        
         const data = await res.json();
-        if (res.ok && data.status === 'ok' && data.db) {
+        if (data.status === 'ok' && data.db) {
           setServerStatus('online');
           setLastError(null);
         } else {
@@ -54,8 +61,13 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
           setLastError(data.error || 'Database connection failed');
         }
       } catch (e: any) {
+        clearTimeout(timeoutId);
         setServerStatus('offline');
-        setLastError(e.message || 'Network error');
+        if (e.name === 'AbortError') {
+          setLastError('Connection timeout (5s)');
+        } else {
+          setLastError(e.message || 'Network error');
+        }
       }
     };
     checkServer();
