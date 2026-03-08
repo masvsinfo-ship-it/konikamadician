@@ -62,7 +62,7 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
           setLastError(null);
         } else {
           setServerStatus('offline');
-          setLastError(data.error || 'Database connection failed');
+          setLastError(`${data.type || 'unknown'}: ${data.error || 'Database connection failed'}`);
         }
       } catch (e: any) {
         clearTimeout(timeoutId);

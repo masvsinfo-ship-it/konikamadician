@@ -18,21 +18,26 @@ let dbError: string | null = null;
 let dbType: 'sqlite' | 'postgres' | 'mongodb' = 'sqlite';
 
 async function initDb(): Promise<boolean> {
-  // 1. Try MongoDB (Highest Priority if MONGODB_URI exists)
+  // Reset error
+  dbError = null;
+
+  // 1. Try MongoDB (Highest Priority)
   if (process.env.MONGODB_URI) {
     try {
       if (!mongoClient) {
-        mongoClient = new MongoClient(process.env.MONGODB_URI);
+        mongoClient = new MongoClient(process.env.MONGODB_URI, {
+          connectTimeoutMS: 10000,
+          serverSelectionTimeoutMS: 10000,
+        });
         await mongoClient.connect();
         console.log('Connected to MongoDB successfully');
       }
       dbType = 'mongodb';
-      dbError = null;
       return true;
     } catch (err: any) {
       console.error('MongoDB connection failed:', err);
       dbError = 'MongoDB Error: ' + err.message;
-      // Continue to fallback
+      // If Mongo is configured but fails, we should know why, but we can try fallback
     }
   }
 
@@ -41,18 +46,17 @@ async function initDb(): Promise<boolean> {
     try {
       await sql`CREATE TABLE IF NOT EXISTS users (loginId TEXT PRIMARY KEY, password TEXT, data TEXT, name TEXT, shopName TEXT, address TEXT, profilePic TEXT)`;
       dbType = 'postgres';
-      dbError = null;
       return true;
     } catch (err: any) {
       console.error('Postgres connection failed:', err);
-      dbError = 'Postgres Error: ' + err.message;
-      // Continue to fallback
+      dbError = (dbError ? dbError + ' | ' : '') + 'Postgres Error: ' + err.message;
     }
   }
 
-  // 3. Fallback to SQLite (Local or Vercel /tmp)
-  if (db) return true;
+  // 3. Fallback to SQLite (Only if not on Vercel or as last resort)
+  // Note: SQLite might fail on Vercel due to native module restrictions
   try {
+    if (db) return true;
     const dbPath = process.env.VERCEL 
       ? path.join('/tmp', 'dokaner_khata_v3.db') 
       : path.resolve(process.cwd(), 'dokaner_khata_v3.db');
@@ -65,11 +69,10 @@ async function initDb(): Promise<boolean> {
     await db.exec(`CREATE TABLE IF NOT EXISTS users (loginId TEXT PRIMARY KEY, password TEXT, data TEXT, name TEXT, shopName TEXT, address TEXT, profilePic TEXT)`);
     
     dbType = 'sqlite';
-    dbError = null;
     return true;
   } catch (err: any) {
     console.error('SQLite connection failed:', err);
-    dbError = 'SQLite Error: ' + err.message;
+    dbError = (dbError ? dbError + ' | ' : '') + 'SQLite Error: ' + err.message;
     return false;
   }
 }
