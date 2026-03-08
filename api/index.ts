@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import Database from 'better-sqlite3';
+import sqlite3 from 'sqlite3';
+import { open, Database } from 'sqlite';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 
@@ -10,10 +11,10 @@ async function startServer() {
   const PORT = 3000;
 
   // Database initialization
-  let db: Database.Database | null = null;
+  let db: Database | null = null;
   let dbError: string | null = null;
 
-  function initDb() {
+  async function initDb() {
     if (db) return db;
     
     try {
@@ -25,10 +26,12 @@ async function startServer() {
         fs.mkdirSync(dir, { recursive: true });
       }
 
-      db = new Database(dbPath, { verbose: console.log });
-      db.pragma('journal_mode = WAL');
+      db = await open({
+        filename: dbPath,
+        driver: sqlite3.Database
+      });
 
-      db.exec(`
+      await db.exec(`
         CREATE TABLE IF NOT EXISTS users (
           loginId TEXT PRIMARY KEY,
           password TEXT,
@@ -53,13 +56,13 @@ async function startServer() {
   }
 
   // Initialize immediately
-  initDb();
+  await initDb();
 
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
 
-  app.get('/api/health', (req, res) => {
-    const database = initDb();
+  app.get('/api/health', async (req, res) => {
+    const database = await initDb();
     res.json({ 
       status: 'ok', 
       db: !!database, 
@@ -72,8 +75,8 @@ async function startServer() {
     res.send('pong');
   });
 
-  app.post('/api/login', (req, res) => {
-    const database = initDb();
+  app.post('/api/login', async (req, res) => {
+    const database = await initDb();
     if (!database) {
       return res.status(500).json({ error: 'ডাটাবেস কানেকশন পাওয়া যায়নি। এরর: ' + dbError });
     }
@@ -82,7 +85,7 @@ async function startServer() {
     console.log('Login attempt for:', loginId);
     
     try {
-      const user = database.prepare('SELECT * FROM users WHERE loginId = ?').get(loginId) as any;
+      const user = await database.get('SELECT * FROM users WHERE loginId = ?', loginId);
       
       if (!user) {
         console.log('User not found:', loginId);
@@ -114,8 +117,8 @@ async function startServer() {
     }
   });
 
-  app.post('/api/register', (req, res) => {
-    const database = initDb();
+  app.post('/api/register', async (req, res) => {
+    const database = await initDb();
     if (!database) {
       return res.status(500).json({ error: 'ডাটাবেস কানেকশন পাওয়া যায়নি। এরর: ' + dbError });
     }
@@ -128,8 +131,10 @@ async function startServer() {
     }
     
     try {
-      const stmt = database.prepare('INSERT INTO users (loginId, password, name, shopName, address, data) VALUES (?, ?, ?, ?, ?, ?)');
-      stmt.run(loginId, password, name, shopName, address, '{}');
+      await database.run(
+        'INSERT INTO users (loginId, password, name, shopName, address, data) VALUES (?, ?, ?, ?, ?, ?)',
+        loginId, password, name, shopName, address, '{}'
+      );
       
       console.log('Registration successful for:', loginId);
       res.json({ 
@@ -146,8 +151,8 @@ async function startServer() {
     }
   });
 
-  app.post('/api/recover-password', (req, res) => {
-    const database = initDb();
+  app.post('/api/recover-password', async (req, res) => {
+    const database = await initDb();
     if (!database) {
       return res.status(500).json({ error: 'Database connection failed.' });
     }
@@ -155,7 +160,7 @@ async function startServer() {
     const { loginId, lastTransactionAmount } = req.body;
     
     try {
-      const user = database.prepare('SELECT * FROM users WHERE loginId = ?').get(loginId) as any;
+      const user = await database.get('SELECT * FROM users WHERE loginId = ?', loginId);
       if (!user) return res.status(404).json({ error: 'ইউজার পাওয়া যায়নি' });
       
       const data = JSON.parse(user.data || '{}');
@@ -173,8 +178,8 @@ async function startServer() {
     }
   });
 
-  app.post('/api/sync', (req, res) => {
-    const database = initDb();
+  app.post('/api/sync', async (req, res) => {
+    const database = await initDb();
     if (!database) {
       return res.status(500).json({ error: 'Database connection failed.' });
     }
@@ -183,16 +188,15 @@ async function startServer() {
     if (!loginId) return res.status(400).json({ error: 'Login ID is required' });
     
     try {
-      const stmt = database.prepare('UPDATE users SET data = ? WHERE loginId = ?');
-      stmt.run(JSON.stringify(data), loginId);
+      await database.run('UPDATE users SET data = ? WHERE loginId = ?', JSON.stringify(data), loginId);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: 'সিঙ্ক করতে সমস্যা হয়েছে: ' + err.message });
     }
   });
 
-  app.post('/api/update-profile', (req, res) => {
-    const database = initDb();
+  app.post('/api/update-profile', async (req, res) => {
+    const database = await initDb();
     if (!database) {
       return res.status(500).json({ error: 'Database connection failed.' });
     }
@@ -200,22 +204,18 @@ async function startServer() {
     const { currentLoginId, newLoginId, name, shopName, address, password, profilePic, githubId, githubUsername } = req.body;
     
     try {
-      database.transaction(() => {
-        if (currentLoginId !== newLoginId) {
-          const exists = database.prepare('SELECT loginId FROM users WHERE loginId = ?').get(newLoginId);
-          if (exists) {
-            throw new Error('MOBILE_EXISTS');
-          }
+      if (currentLoginId !== newLoginId) {
+        const exists = await database.get('SELECT loginId FROM users WHERE loginId = ?', newLoginId);
+        if (exists) {
+          return res.status(400).json({ error: 'এই মোবাইল নাম্বারটি ইতিমধ্যে অন্য কেউ ব্যবহার করছেন' });
         }
+      }
 
-        const stmt = database.prepare(`
-          UPDATE users 
-          SET loginId = ?, name = ?, shopName = ?, address = ?, password = ?, profilePic = ?, githubId = ?, githubUsername = ?
-          WHERE loginId = ?
-        `);
-        
-        stmt.run(newLoginId, name, shopName, address, password, profilePic, githubId, githubUsername, currentLoginId);
-      })();
+      await database.run(`
+        UPDATE users 
+        SET loginId = ?, name = ?, shopName = ?, address = ?, password = ?, profilePic = ?, githubId = ?, githubUsername = ?
+        WHERE loginId = ?
+      `, newLoginId, name, shopName, address, password, profilePic, githubId, githubUsername, currentLoginId);
       
       res.json({ 
         success: true, 
@@ -230,10 +230,26 @@ async function startServer() {
         } 
       });
     } catch (err: any) {
-      if (err.message === 'MOBILE_EXISTS') {
-        return res.status(400).json({ error: 'এই মোবাইল নাম্বারটি ইতিমধ্যে অন্য কেউ ব্যবহার করছেন' });
-      }
       res.status(500).json({ error: 'প্রোফাইল আপডেট করতে সমস্যা হয়েছে: ' + err.message });
+    }
+  });
+
+  app.get('/api/test-db', async (req, res) => {
+    try {
+      const database = await initDb();
+      if (!database) throw new Error('Database not initialized: ' + dbError);
+      
+      const testId = 'test_' + Date.now();
+      await database.run('INSERT INTO users (loginId, password, name, shopName, address, data) VALUES (?, ?, ?, ?, ?, ?)',
+        testId, 'test', 'Test', 'Test Shop', 'Test Address', '{}'
+      );
+      const user = await database.get('SELECT * FROM users WHERE loginId = ?', testId);
+      await database.run('DELETE FROM users WHERE loginId = ?', testId);
+      
+      res.json({ success: true, message: 'Database is working correctly', user });
+    } catch (err: any) {
+      console.error('Database test failed:', err);
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -304,6 +320,12 @@ async function startServer() {
       console.error('GitHub OAuth error:', error);
       res.status(500).send(`Authentication failed: ${error.message}`);
     }
+  });
+
+  // Global error handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ error: 'সার্ভারে একটি অভ্যন্তরীণ সমস্যা হয়েছে: ' + err.message });
   });
 
   // Vite middleware for development

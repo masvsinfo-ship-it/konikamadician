@@ -208,11 +208,21 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
 
           <div className="bg-white p-8 lg:p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 relative">
             {/* Server Status Dot */}
-            <div className="absolute top-6 right-8 flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${serverStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                {serverStatus === 'online' ? 'Online' : 'Offline'}
-              </span>
+            <div className="absolute top-6 right-8 flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${serverStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  {serverStatus === 'online' ? 'Online' : 'Offline'}
+                </span>
+              </div>
+              {serverStatus === 'offline' && (
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="text-[8px] font-bold text-emerald-600 underline uppercase tracking-widest"
+                >
+                  Retry Connection
+                </button>
+              )}
             </div>
 
             <div className="mb-8">
