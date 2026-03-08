@@ -82,13 +82,13 @@ export default function App() {
     const storedLoginId = localStorage.getItem('loginId');
     const storedPassword = localStorage.getItem('password');
     
-    const initApp = async (retries = 3) => {
+    const initApp = async (retries = 5) => {
       try {
         // Wait for server to be ready
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Check if server is reachable
-        const healthRes = await fetch('/api/health').catch(() => null);
+        // Check if server is reachable with cache busting
+        const healthRes = await fetch(`/api/health?t=${Date.now()}`).catch(() => null);
         
         if (healthRes && healthRes.ok) {
           const healthData = await healthRes.json();

@@ -44,10 +44,14 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   useEffect(() => {
     const checkServer = async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // Increased to 8s
       
       try {
-        const res = await fetch('/api/health', { signal: controller.signal });
+        // Cache busting with timestamp
+        const res = await fetch(`/api/health?t=${Date.now()}`, { 
+          signal: controller.signal,
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         clearTimeout(timeoutId);
         
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -62,16 +66,27 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
         }
       } catch (e: any) {
         clearTimeout(timeoutId);
+        
+        // Try a simpler ping if health fails
+        try {
+          const pingRes = await fetch(`/api/ping?t=${Date.now()}`);
+          if (pingRes.ok) {
+            setServerStatus('online');
+            setLastError(null);
+            return;
+          }
+        } catch (pingErr) {}
+
         setServerStatus('offline');
         if (e.name === 'AbortError') {
-          setLastError('Connection timeout (5s)');
+          setLastError('Connection timeout (8s)');
         } else {
           setLastError(e.message || 'Network error');
         }
       }
     };
     checkServer();
-    const interval = setInterval(checkServer, 10000);
+    const interval = setInterval(checkServer, 15000); // Check every 15s
     return () => clearInterval(interval);
   }, []);
 
