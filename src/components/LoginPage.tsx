@@ -44,6 +44,11 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   useEffect(() => {
     const checkServer = async () => {
       try {
+        // First try a simple ping to see if the API is reachable
+        const pingRes = await fetch('/api/ping');
+        if (!pingRes.ok) throw new Error('Ping failed');
+
+        // Then check full health
         const res = await fetch('/api/health');
         const data = await res.json();
         if (res.ok && data.status === 'ok' && data.db) {
@@ -51,11 +56,11 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
           setLastError(null);
         } else {
           setServerStatus('offline');
-          setLastError(data.error || `Server Error (${res.status})`);
+          setLastError(data.error || `Database Error (${res.status})`);
         }
       } catch (e: any) {
         setServerStatus('offline');
-        setLastError('সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না।');
+        setLastError('সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। (Network Error)');
       }
     };
     checkServer();

@@ -1,17 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import sqlite3 from 'sqlite3';
-import { open, Database } from 'sqlite';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import { MongoClient } from 'mongodb';
 
 const app = express();
 const PORT = 3000;
 
 // Database state
-let db: Database | null = null;
+let db: any = null;
 let mongoClient: MongoClient | null = null;
 let dbError: string | null = null;
 let dbType: 'sqlite' | 'mongodb' = 'sqlite';
@@ -35,26 +32,27 @@ async function initDb(): Promise<boolean> {
     } catch (err: any) {
       console.error('MongoDB error:', err);
       dbError = 'MongoDB Error: ' + err.message;
-      // On Vercel, if Mongo fails, we can't fallback to SQLite easily
       if (process.env.VERCEL) return false;
     }
   }
 
   // 2. Fallback to SQLite (Only if not on Vercel)
   if (process.env.VERCEL) {
-    if (!process.env.MONGODB_URI) {
-      dbError = 'MONGODB_URI is not set in Vercel Environment Variables. Please add it to fix this error.';
-    }
+    dbError = 'MONGODB_URI is not set in Vercel. Please add it to fix this error.';
     return false;
   }
 
   if (db) return true;
   try {
+    // Dynamic import to avoid issues on Vercel
+    const sqlite3 = await import('sqlite3');
+    const { open } = await import('sqlite');
+    
     const dbPath = path.resolve(process.cwd(), 'dokaner_khata.db');
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     
-    db = await open({ filename: dbPath, driver: sqlite3.Database });
+    db = await open({ filename: dbPath, driver: sqlite3.default.Database });
     await db.exec(`CREATE TABLE IF NOT EXISTS users (loginId TEXT PRIMARY KEY, password TEXT, data TEXT, name TEXT, shopName TEXT, address TEXT, profilePic TEXT)`);
     
     dbType = 'sqlite';
@@ -81,9 +79,15 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health Check
 app.get('/api/health', async (req, res) => {
-  const ready = await initDb();
-  res.json({ status: 'ok', db: ready, type: dbType, error: dbError });
+  try {
+    const ready = await initDb();
+    res.json({ status: 'ok', db: ready, type: dbType, error: dbError });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', error: err.message });
+  }
 });
+
+app.get('/api/ping', (req, res) => res.json({ status: 'ok' }));
 
 // Auth Routes
 app.post('/api/login', async (req, res) => {
@@ -170,23 +174,9 @@ app.post('/api/recover-password', async (req, res) => {
   }
 });
 
-// Server Start
-async function startServer() {
-  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
-    const vite = await createViteServer({ server: { middlewareMode: true, hmr: false }, appType: "spa" });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.resolve(process.cwd(), 'dist');
-    if (fs.existsSync(distPath)) {
-      app.use(express.static(distPath));
-      app.get('*', (req, res, next) => {
-        if (req.url.startsWith('/api/')) return next();
-        res.sendFile(path.resolve(distPath, 'index.html'));
-      });
-    }
-  }
-  if (!process.env.VERCEL) app.listen(PORT, '0.0.0.0', () => console.log(`Server on port ${PORT}`));
+// Server Start (Local only)
+if (!process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => console.log(`Server on port ${PORT}`));
 }
 
-if (!process.env.VERCEL) startServer().catch(console.error);
 export default app;
