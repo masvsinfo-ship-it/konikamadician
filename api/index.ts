@@ -12,17 +12,39 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Database state
-let mongoClient: MongoClient | null = null;
+let cachedClient: MongoClient | null = null;
 
 async function getDb() {
-  if (process.env.MONGODB_URI) {
-    if (!mongoClient) {
-      mongoClient = new MongoClient(process.env.MONGODB_URI);
-      await mongoClient.connect();
+  const uri = process.env.MONGODB_URI;
+  if (!uri) return { type: 'none', error: 'MONGODB_URI missing' };
+
+  try {
+    // If we have a cached client, check if it's still connected
+    if (cachedClient) {
+      try {
+        // Ping the database to check if connection is alive
+        await cachedClient.db('admin').command({ ping: 1 });
+        return { type: 'mongodb', client: cachedClient };
+      } catch (e) {
+        console.log('Cached MongoDB connection lost, reconnecting...');
+        cachedClient = null;
+      }
     }
-    return { type: 'mongodb', client: mongoClient };
+
+    // Create a new connection
+    const client = new MongoClient(uri, {
+      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 10000,
+    });
+    await client.connect();
+    cachedClient = client;
+    console.log('New MongoDB connection established');
+    return { type: 'mongodb', client: cachedClient };
+  } catch (err: any) {
+    console.error('MongoDB connection error:', err);
+    cachedClient = null;
+    throw err;
   }
-  return { type: 'none', error: 'MONGODB_URI missing' };
 }
 
 // Routes
