@@ -35,6 +35,8 @@ async function getDb() {
     const client = new MongoClient(uri, {
       connectTimeoutMS: 10000,
       serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      family: 4, // Force IPv4 to avoid some SSL/DNS issues in serverless
     });
     await client.connect();
     cachedClient = client;
