@@ -43,50 +43,23 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
 
   useEffect(() => {
     const checkServer = async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // Increased to 8s
-      
       try {
-        // Cache busting with timestamp
-        const res = await fetch(`/api/health?t=${Date.now()}`, { 
-          signal: controller.signal,
-          headers: { 'Cache-Control': 'no-cache' }
-        });
-        clearTimeout(timeoutId);
-        
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        
+        const res = await fetch('/api/health');
         const data = await res.json();
         if (data.status === 'ok' && data.db) {
           setServerStatus('online');
           setLastError(null);
         } else {
           setServerStatus('offline');
-          setLastError(`${data.type || 'unknown'}: ${data.error || 'Database connection failed'}`);
+          setLastError(data.error || 'Database error');
         }
       } catch (e: any) {
-        clearTimeout(timeoutId);
-        
-        // Try a simpler ping if health fails
-        try {
-          const pingRes = await fetch(`/api/ping?t=${Date.now()}`);
-          if (pingRes.ok) {
-            setServerStatus('online');
-            setLastError(null);
-            return;
-          }
-        } catch (pingErr) {}
-
         setServerStatus('offline');
-        if (e.name === 'AbortError') {
-          setLastError('Connection timeout (8s)');
-        } else {
-          setLastError(e.message || 'Network error');
-        }
+        setLastError('Server unreachable');
       }
     };
     checkServer();
-    const interval = setInterval(checkServer, 15000); // Check every 15s
+    const interval = setInterval(checkServer, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -126,33 +99,20 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
           body: JSON.stringify({ loginId, password, name, shopName, address })
         });
         const data = await res.json();
-        if (data.success) onLogin({}, loginId, password, data.profile);
-        else setError(data.error || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে।');
-      } else {
-        // Login Logic
-        if (serverStatus === 'offline') {
-          const savedLoginId = localStorage.getItem('loginId');
-          const savedPassword = localStorage.getItem('password');
-          const savedProfile = localStorage.getItem(`user_profile_${loginId}`);
-
-          if (savedProfile && savedLoginId === loginId && (savedPassword === password || !savedPassword)) {
-            const profile = JSON.parse(savedProfile);
-            const savedData = {
-              transactions: JSON.parse(localStorage.getItem(`transactions_${loginId}`) || '[]'),
-              customers: JSON.parse(localStorage.getItem(`customers_${loginId}`) || '[]'),
-              shortList: JSON.parse(localStorage.getItem(`shortList_${loginId}`) || '[]'),
-              expenses: JSON.parse(localStorage.getItem(`expenses_${loginId}`) || '[]'),
-              settings: JSON.parse(localStorage.getItem(`settings_${loginId}`) || '{}'),
-            };
-            onLogin(savedData, loginId, password, profile);
-            return;
-          } else {
-            setError('সার্ভার অফলাইন এবং অফলাইন লগইন তথ্য পাওয়া যায়নি।');
-            setIsLoading(false);
-            return;
-          }
+        if (data.success) {
+          // After registration, automatically log in
+          const loginRes = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ loginId, password })
+          });
+          const loginData = await loginRes.json();
+          if (loginData.success) onLogin(loginData.data, loginId, password, loginData.profile);
+          else setMode('login');
+        } else {
+          setError(data.error || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে।');
         }
-
+      } else {
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -163,7 +123,7 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
         else setError(data.error || 'লগইন ব্যর্থ হয়েছে। সঠিক তথ্য দিন।');
       }
     } catch (err: any) {
-      setError('নেটওয়ার্ক সমস্যা। আবার চেষ্টা করুন।');
+      setError('সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। আপনার ইন্টারনেট কানেকশন চেক করুন।');
     } finally {
       setIsLoading(false);
     }
