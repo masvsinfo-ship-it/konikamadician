@@ -35,16 +35,20 @@ async function initDb(): Promise<boolean> {
     } catch (err: any) {
       console.error('MongoDB error:', err);
       dbError = 'MongoDB: ' + err.message;
+      // If on Vercel and MongoDB fails, we can't really fallback to SQLite easily
+      if (process.env.VERCEL) return false;
     }
   }
 
-  // 2. Fallback to SQLite
+  // 2. Fallback to SQLite (Only if not on Vercel or if MongoDB is not configured)
+  if (process.env.VERCEL && !process.env.MONGODB_URI) {
+    dbError = 'MONGODB_URI is missing in Vercel environment variables.';
+    return false;
+  }
+
   if (db) return true;
   try {
-    const dbPath = process.env.VERCEL 
-      ? path.join('/tmp', 'dokaner_khata.db') 
-      : path.resolve(process.cwd(), 'dokaner_khata.db');
-      
+    const dbPath = path.resolve(process.cwd(), 'dokaner_khata.db');
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     
