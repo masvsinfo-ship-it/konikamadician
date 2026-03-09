@@ -30,7 +30,10 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('is_authenticated') === 'true';
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    // Only show loading if we have credentials to check
+    return !!(localStorage.getItem('loginId') && localStorage.getItem('password'));
+  });
   const [deferredPrompt, setDeferredPrompt] = useState<any>(capturedPrompt);
 
   useEffect(() => {
@@ -74,28 +77,44 @@ export default function App() {
     resetAllData,
   } = useStore();
 
-  // Notification Logic
+  // 1. Splash Screen Timer & Safety Timeout
   useEffect(() => {
     const splashTimer = setTimeout(() => {
       setShowSplash(false);
     }, 2000);
 
+    // Safety timeout to ensure loading screen always disappears
+    const safetyTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 5000);
+
+    return () => {
+      clearTimeout(splashTimer);
+      clearTimeout(safetyTimer);
+    };
+  }, []);
+
+  // 2. App Initialization (Run once on mount)
+  useEffect(() => {
     const storedLoginId = localStorage.getItem('loginId');
     const storedPassword = localStorage.getItem('password');
     
+    if (!storedLoginId || !storedPassword) {
+      setIsLoading(false);
+      return;
+    }
+
     const initApp = async () => {
       try {
-        if (storedLoginId && storedPassword) {
-          const result = storageService.login(storedLoginId, storedPassword);
-          if (result.success) {
-            setAllData(result.data, storedLoginId, result.profile);
-            localStorage.setItem('is_authenticated', 'true');
-          } else {
-            localStorage.removeItem('loginId');
-            localStorage.removeItem('password');
-            localStorage.removeItem('is_authenticated');
-            setIsAuthenticated(false);
-          }
+        const result = storageService.login(storedLoginId, storedPassword);
+        if (result.success) {
+          setAllData(result.data, storedLoginId, result.profile);
+          localStorage.setItem('is_authenticated', 'true');
+        } else {
+          localStorage.removeItem('loginId');
+          localStorage.removeItem('password');
+          localStorage.removeItem('is_authenticated');
+          setIsAuthenticated(false);
         }
       } catch (err) {
         console.error('Initialization error:', err);
@@ -105,7 +124,10 @@ export default function App() {
     };
 
     initApp();
+  }, [setAllData, setIsAuthenticated]); // Added dependencies for safety
 
+  // 3. Notification & Background Logic
+  useEffect(() => {
     const checkNotifications = () => {
       const now = new Date();
       const hours = now.getHours();
@@ -183,7 +205,6 @@ export default function App() {
     checkNotifications();
     const interval = setInterval(checkNotifications, 60000); // Check every minute
     return () => {
-      clearTimeout(splashTimer);
       clearInterval(interval);
     };
   }, [customers, transactions, expenses, userProfile]);
@@ -265,13 +286,21 @@ export default function App() {
             </div>
           </div>
         </div>
-        <div className="mt-12 flex flex-col items-center gap-2">
+        <div className="mt-12 flex flex-col items-center gap-4">
           <div className="flex gap-1">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"></div>
           </div>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Loading Data...</p>
+          
+          {/* Fallback button if stuck */}
+          <button 
+            onClick={() => { setShowSplash(false); setIsLoading(false); }}
+            className="mt-4 text-[10px] font-bold text-emerald-600 underline uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity"
+          >
+            Force Start App
+          </button>
         </div>
       </div>
     );
