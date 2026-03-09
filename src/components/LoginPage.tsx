@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { storageService } from '../services/storageService';
 import { 
   Lock, 
   BookOpen, 
@@ -38,35 +39,6 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   const [recoveredPassword, setRecoveredPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-  const [lastError, setLastError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const checkServer = async () => {
-      try {
-        // First try a simple ping to see if the API is reachable
-        const pingRes = await fetch('/api/ping');
-        if (!pingRes.ok) throw new Error('Ping failed');
-
-        // Then check full health
-        const res = await fetch('/api/health');
-        const data = await res.json();
-        if (res.ok && data.status === 'ok' && data.db) {
-          setServerStatus('online');
-          setLastError(null);
-        } else {
-          setServerStatus('offline');
-          setLastError(data.error || `Database Error (${res.status})`);
-        }
-      } catch (e: any) {
-        setServerStatus('offline');
-        setLastError('সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। (Network Error)');
-      }
-    };
-    checkServer();
-    const interval = setInterval(checkServer, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) {
@@ -87,51 +59,37 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
     setError('');
     setIsLoading(true);
 
-    try {
-      if (mode === 'recover') {
-        const res = await fetch('/api/recover-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ loginId, lastTransactionAmount })
-        });
-        const data = await res.json();
-        if (data.success) setRecoveredPassword(data.password);
-        else setError(data.error || 'পাসওয়ার্ড উদ্ধার করা সম্ভব হয়নি।');
-      } else if (mode === 'register') {
-        const res = await fetch('/api/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ loginId, password, name, shopName, address })
-        });
-        const data = await res.json();
-        if (data.success) {
-          // After registration, automatically log in
-          const loginRes = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ loginId, password })
+    // Simulate a small delay for better UX
+    setTimeout(() => {
+      try {
+        if (mode === 'recover') {
+          const result = storageService.recoverPassword(loginId, lastTransactionAmount);
+          if (result.success) setRecoveredPassword(result.password!);
+          else setError(result.error || 'পাসওয়ার্ড উদ্ধার করা সম্ভব হয়নি।');
+        } else if (mode === 'register') {
+          const result = storageService.register({
+            loginId,
+            password,
+            profile: { name, shopName, address, mobile: loginId }
           });
-          const loginData = await loginRes.json();
-          if (loginData.success) onLogin(loginData.data, loginId, password, loginData.profile);
-          else setMode('login');
+          if (result.success) {
+            const loginResult = storageService.login(loginId, password);
+            if (loginResult.success) onLogin(loginResult.data, loginId, password, loginResult.profile);
+            else setMode('login');
+          } else {
+            setError(result.error || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে।');
+          }
         } else {
-          setError(data.error || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে।');
+          const result = storageService.login(loginId, password);
+          if (result.success) onLogin(result.data, loginId, password, result.profile);
+          else setError(result.error || 'লগইন ব্যর্থ হয়েছে। সঠিক তথ্য দিন।');
         }
-      } else {
-        const res = await fetch('/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ loginId, password })
-        });
-        const data = await res.json();
-        if (data.success) onLogin(data.data, loginId, password, data.profile);
-        else setError(data.error || 'লগইন ব্যর্থ হয়েছে। সঠিক তথ্য দিন।');
+      } catch (err: any) {
+        setError('একটি সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err: any) {
-      setError('সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। আপনার ইন্টারনেট কানেকশন চেক করুন।');
-    } finally {
-      setIsLoading(false);
-    }
+    }, 800);
   };
 
   return (
@@ -208,31 +166,6 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
           </div>
 
           <div className="bg-white p-8 lg:p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 relative">
-            {/* Server Status Dot */}
-            <div className="absolute top-6 right-8 flex flex-col items-end gap-1">
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${serverStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  {serverStatus === 'online' ? 'Online' : 'Offline'}
-                </span>
-              </div>
-              {serverStatus === 'offline' && (
-                <div className="flex flex-col items-end">
-                  <button 
-                    onClick={() => window.location.reload()}
-                    className="text-[8px] font-bold text-emerald-600 underline uppercase tracking-widest"
-                  >
-                    Retry Connection
-                  </button>
-                  {lastError && (
-                    <span className="text-[8px] text-red-500 font-medium max-w-[150px] text-right truncate">
-                      {lastError}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
             <div className="mb-8">
               <h2 className="text-3xl font-black text-slate-900 tracking-tight">
                 {mode === 'login' ? 'স্বাগতম!' : mode === 'register' ? 'নতুন একাউন্ট' : 'পাসওয়ার্ড উদ্ধার'}

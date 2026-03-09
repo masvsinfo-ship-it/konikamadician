@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { storageService } from '../services/storageService';
 import { Transaction, Customer, ShortItem, AppSettings, DEFAULT_SETTINGS, Expense, UserProfile } from '../types';
 
 export function useStore() {
@@ -114,23 +115,16 @@ export function useStore() {
 
     if (!loginId) return;
 
-    const syncData = async () => {
+    const syncData = () => {
       try {
-        // Sync to local server
-        await fetch('/api/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            loginId,
-            data: { transactions, customers, shortList, expenses, settings }
-          })
-        });
+        // Sync to local storage service
+        storageService.syncData(loginId, { transactions, customers, shortList, expenses, settings });
       } catch (error) {
         console.error('Failed to sync data:', error);
       }
     };
 
-    const timer = setTimeout(syncData, 2000);
+    const timer = setTimeout(syncData, 1000);
     return () => clearTimeout(timer);
   }, [transactions, customers, shortList, expenses, settings, isInitialized, loginId, userProfile]);
 

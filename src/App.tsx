@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from './hooks/useStore';
+import { storageService } from './services/storageService';
 import { Layout, AppNotification } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { Sales } from './components/Sales';
@@ -77,59 +78,27 @@ export default function App() {
   useEffect(() => {
     const splashTimer = setTimeout(() => {
       setShowSplash(false);
-    }, 2500);
+    }, 2000);
 
     const storedLoginId = localStorage.getItem('loginId');
     const storedPassword = localStorage.getItem('password');
     
-    const initApp = async (retries = 5) => {
+    const initApp = async () => {
       try {
-        // Wait for server to be ready
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Check if server is reachable with cache busting
-        const healthRes = await fetch(`/api/health?t=${Date.now()}`).catch(() => null);
-        
-        if (healthRes && healthRes.ok) {
-          const healthData = await healthRes.json();
-          if (!healthData.db && retries > 0) {
-            console.warn('Server up but DB not ready, retrying...');
-            return initApp(retries - 1);
-          }
-
-          if (storedLoginId && storedPassword) {
-            const res = await fetch('/api/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ loginId: storedLoginId, password: storedPassword })
-            });
-            const data = await res.json();
-            if (data.success) {
-              setAllData(data.data, storedLoginId, data.profile);
-              localStorage.setItem('is_authenticated', 'true');
-            } else {
-              localStorage.removeItem('loginId');
-              localStorage.removeItem('password');
-              localStorage.removeItem('is_authenticated');
-              setIsAuthenticated(false);
-            }
-          }
-        } else if (retries > 0) {
-          console.warn('Server not reachable, retrying...', retries);
-          return initApp(retries - 1);
-        } else {
-          console.warn('Server is offline after retries, using local data');
-          if (storedLoginId && storedPassword) {
-            setIsAuthenticated(true);
-            setAllData({}, storedLoginId, userProfile || undefined);
+        if (storedLoginId && storedPassword) {
+          const result = storageService.login(storedLoginId, storedPassword);
+          if (result.success) {
+            setAllData(result.data, storedLoginId, result.profile);
+            localStorage.setItem('is_authenticated', 'true');
+          } else {
+            localStorage.removeItem('loginId');
+            localStorage.removeItem('password');
+            localStorage.removeItem('is_authenticated');
+            setIsAuthenticated(false);
           }
         }
       } catch (err) {
         console.error('Initialization error:', err);
-        if (storedLoginId && storedPassword) {
-          setIsAuthenticated(true);
-          setAllData({}, storedLoginId, userProfile || undefined);
-        }
       } finally {
         setIsLoading(false);
       }

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { AppSettings, UserProfile } from '../types';
+import { storageService } from '../services/storageService';
 import { Save, Trash2, AlertTriangle, Lock, User, Upload, Camera, Github, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
@@ -56,30 +57,36 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
     setIsUpdatingProfile(true);
     try {
       const currentLoginId = localStorage.getItem('loginId');
-      const res = await fetch('/api/update-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentLoginId,
-          newLoginId: profileMobile,
+      if (!currentLoginId) throw new Error('Not logged in');
+
+      const result = storageService.updateProfile(currentLoginId, {
+        loginId: profileMobile,
+        password: profilePassword,
+        profile: {
           name: profileName,
           shopName: profileShopName,
           address: profileAddress,
-          password: profilePassword,
+          mobile: profileMobile,
           profilePic
-        })
+        }
       });
-      const data = await res.json();
-      if (data.success) {
-        onUpdateProfile(data.profile);
+
+      if (result.success) {
+        onUpdateProfile({
+          name: profileName,
+          shopName: profileShopName,
+          address: profileAddress,
+          mobile: profileMobile,
+          profilePic
+        });
         localStorage.setItem('loginId', profileMobile);
         localStorage.setItem('password', profilePassword);
         alert('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
       } else {
-        alert(data.error || 'প্রোফাইল আপডেট ব্যর্থ হয়েছে');
+        alert(result.error || 'প্রোফাইল আপডেট ব্যর্থ হয়েছে');
       }
     } catch (err) {
-      alert('নেটওয়ার্ক সমস্যা। আবার চেষ্টা করুন।');
+      alert('একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।');
     } finally {
       setIsUpdatingProfile(false);
     }
