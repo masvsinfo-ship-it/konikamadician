@@ -46,16 +46,16 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
       try {
         const res = await fetch('/api/health');
         const data = await res.json();
-        if (data.status === 'ok' && data.db) {
+        if (res.ok && data.status === 'ok' && data.db) {
           setServerStatus('online');
           setLastError(null);
         } else {
           setServerStatus('offline');
-          setLastError(data.error || 'Database error');
+          setLastError(data.error || `Server Error (${res.status})`);
         }
       } catch (e: any) {
         setServerStatus('offline');
-        setLastError('Server unreachable');
+        setLastError('সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না।');
       }
     };
     checkServer();

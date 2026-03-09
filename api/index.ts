@@ -24,8 +24,8 @@ async function initDb(): Promise<boolean> {
     try {
       if (!mongoClient) {
         mongoClient = new MongoClient(process.env.MONGODB_URI, {
-          connectTimeoutMS: 10000,
-          serverSelectionTimeoutMS: 10000,
+          connectTimeoutMS: 5000,
+          serverSelectionTimeoutMS: 5000,
         });
         await mongoClient.connect();
         console.log('MongoDB connected');
@@ -34,15 +34,17 @@ async function initDb(): Promise<boolean> {
       return true;
     } catch (err: any) {
       console.error('MongoDB error:', err);
-      dbError = 'MongoDB: ' + err.message;
-      // If on Vercel and MongoDB fails, we can't really fallback to SQLite easily
+      dbError = 'MongoDB Error: ' + err.message;
+      // On Vercel, if Mongo fails, we can't fallback to SQLite easily
       if (process.env.VERCEL) return false;
     }
   }
 
-  // 2. Fallback to SQLite (Only if not on Vercel or if MongoDB is not configured)
-  if (process.env.VERCEL && !process.env.MONGODB_URI) {
-    dbError = 'MONGODB_URI is missing in Vercel environment variables.';
+  // 2. Fallback to SQLite (Only if not on Vercel)
+  if (process.env.VERCEL) {
+    if (!process.env.MONGODB_URI) {
+      dbError = 'MONGODB_URI is not set in Vercel Environment Variables. Please add it to fix this error.';
+    }
     return false;
   }
 
@@ -59,7 +61,7 @@ async function initDb(): Promise<boolean> {
     return true;
   } catch (err: any) {
     console.error('SQLite error:', err);
-    dbError = (dbError ? dbError + ' | ' : '') + 'SQLite: ' + err.message;
+    dbError = 'SQLite Error: ' + err.message;
     return false;
   }
 }
