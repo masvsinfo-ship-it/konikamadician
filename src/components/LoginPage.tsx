@@ -344,24 +344,31 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
 
           {/* App Install & Footer */}
           <div className="space-y-6">
-            <button
-              onClick={handleInstall}
-              className="w-full bg-white border border-slate-200 p-4 rounded-3xl flex items-center gap-4 hover:bg-slate-50 transition-all group"
-            >
-              <div className="h-12 w-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
-                <Smartphone className="h-6 w-6" />
-              </div>
-              <div className="text-left">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Get it on Android</p>
-                <p className="text-lg font-black text-slate-900 leading-none">Install Web App</p>
-              </div>
-              <Download className="h-5 w-5 text-slate-300 ml-auto group-hover:translate-y-1 transition-transform" />
-            </button>
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              <button
+                onClick={handleInstall}
+                className="relative w-full bg-white border border-slate-200 p-5 rounded-[2rem] flex items-center gap-5 hover:bg-slate-50 transition-all shadow-xl shadow-slate-200/50"
+              >
+                <div className="h-14 w-14 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20 group-hover:scale-110 transition-transform">
+                  <Smartphone className="h-8 w-8" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">Android App (APK)</p>
+                  <p className="text-xl font-black text-slate-900 leading-none">সরাসরি ইন্সটল করুন</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">অটোমেটিক এন্ড্রয়েড ইন্সটলেশন</p>
+                </div>
+                <div className="ml-auto flex flex-col items-center gap-1">
+                  <Download className="h-6 w-6 text-emerald-600 animate-bounce" />
+                  <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">APK</span>
+                </div>
+              </button>
+            </div>
 
             <div className="text-center space-y-4">
               <div className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                <span>সকল তথ্য ক্লাউডে সুরক্ষিত</span>
+                <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                <span>১০০% নিরাপদ ও ডিজিটাল হিসাব খাতা</span>
               </div>
               <p className="text-[10px] font-bold text-slate-300">© {new Date().getFullYear()} কনিকা মেডিসিন কর্ণার | জামালপুর</p>
             </div>
