@@ -40,17 +40,35 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleInstall = async () => {
-    if (!deferredPrompt) {
-      alert('ইন্সটল অপশনটি এখনও প্রস্তুত হয়নি। ব্রাউজারের মেনু থেকে "Install App" বা "Add to Home Screen" ব্যবহার করুন।');
-      return;
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
+      setIsInstalled(true);
     }
-    try {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') setDeferredPrompt(null);
-    } catch (err) {
-      console.error('Install error:', err);
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') setDeferredPrompt(null);
+      } catch (err) {
+        console.error('Install error:', err);
+      }
+    } else {
+      // Fallback instructions if prompt is not ready
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      const isAndroid = /Android/.test(navigator.userAgent);
+      
+      if (isIOS) {
+        alert('আইফোনে ইন্সটল করতে:\n১. নিচে "Share" বাটনে ক্লিক করুন\n২. তারপর "Add to Home Screen" সিলেক্ট করুন।');
+      } else if (isAndroid) {
+        alert('এন্ড্রয়েডে ইন্সটল করতে:\n১. ব্রাউজারের উপরে ডানদিকের ৩-ডট (⋮) মেনুতে ক্লিক করুন\n২. "Install App" অথবা "Add to Home Screen" সিলেক্ট করুন।');
+      } else {
+        alert('অ্যাপটি ইন্সটল করতে ব্রাউজারের মেনু থেকে "Install App" বা "Add to Home Screen" অপশনটি ব্যবহার করুন।');
+      }
     }
   };
 
@@ -347,20 +365,32 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
               <button
-                onClick={handleInstall}
-                className="relative w-full bg-white border border-slate-200 p-5 rounded-[2rem] flex items-center gap-5 hover:bg-slate-50 transition-all shadow-xl shadow-slate-200/50"
+                onClick={isInstalled ? undefined : handleInstall}
+                className={`relative w-full bg-white border border-slate-200 p-5 rounded-[2rem] flex items-center gap-5 transition-all shadow-xl shadow-slate-200/50 ${isInstalled ? 'opacity-75 cursor-default' : 'hover:bg-slate-50'}`}
               >
-                <div className="h-14 w-14 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20 group-hover:scale-110 transition-transform">
+                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform ${isInstalled ? 'bg-slate-400 group-hover:scale-100' : 'bg-emerald-600 shadow-emerald-600/20 group-hover:scale-110'}`}>
                   <Smartphone className="h-8 w-8" />
                 </div>
                 <div className="text-left">
-                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">Android App (APK)</p>
-                  <p className="text-xl font-black text-slate-900 leading-none">সরাসরি ইন্সটল করুন</p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1">অটোমেটিক এন্ড্রয়েড ইন্সটলেশন</p>
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">
+                    {isInstalled ? 'App Installed' : 'Android App (PWA)'}
+                  </p>
+                  <p className="text-xl font-black text-slate-900 leading-none">
+                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : 'সরাসরি ইন্সটল করুন'}
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">
+                    {isInstalled ? 'আপনার হোম স্ক্রিন থেকে ওপেন করুন' : 'APK ছাড়াই অ্যাপের মতো ব্যবহার করুন'}
+                  </p>
                 </div>
                 <div className="ml-auto flex flex-col items-center gap-1">
-                  <Download className="h-6 w-6 text-emerald-600 animate-bounce" />
-                  <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">APK</span>
+                  {isInstalled ? (
+                    <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                  ) : (
+                    <>
+                      <Download className="h-6 w-6 text-emerald-600 animate-bounce" />
+                      <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">APK</span>
+                    </>
+                  )}
                 </div>
               </button>
             </div>

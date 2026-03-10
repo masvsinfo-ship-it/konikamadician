@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { AppSettings, UserProfile } from '../types';
 import { storageService } from '../services/storageService';
-import { Save, Trash2, AlertTriangle, Lock, User, Upload, Camera, Github, CheckCircle2 } from 'lucide-react';
+import { Save, Trash2, AlertTriangle, Lock, User, Upload, Camera, Github, CheckCircle2, Download, FileJson } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 interface SettingsProps {
@@ -24,6 +24,7 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
   const [profilePic, setProfilePic] = useState(userProfile?.profilePic || '');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = (key: keyof AppSettings, value: string) => {
     setLocalSettings(prev => ({
@@ -35,6 +36,51 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
   const handleSave = () => {
     onUpdateSettings(localSettings);
     alert('সেটিংস সংরক্ষণ করা হয়েছে!');
+  };
+
+  const handleBackup = () => {
+    const loginId = localStorage.getItem('loginId');
+    if (!loginId) return;
+    
+    const data = storageService.getBackupData(loginId);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dokaner_khata_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (!data.loginId || !data.password) {
+          alert('ভুল ফাইল! এটি সঠিক ব্যাকআপ ফাইল নয়।');
+          return;
+        }
+
+        if (confirm('আপনি কি এই ব্যাকআপ ফাইলটি রিস্টোর করতে চান? এটি আপনার বর্তমান সকল তথ্য মুছে ফেলবে।')) {
+          const success = storageService.restoreBackupData(data);
+          if (success) {
+            alert('ব্যাকআপ সফলভাবে রিস্টোর হয়েছে! অ্যাপটি রিলোড হবে।');
+            window.location.reload();
+          } else {
+            alert('ব্যাকআপ রিস্টোর করতে সমস্যা হয়েছে।');
+          }
+        }
+      } catch (err) {
+        alert('ফাইলটি পড়তে সমস্যা হয়েছে।');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,6 +239,56 @@ export function Settings({ settings, userProfile, onUpdateSettings, onUpdateProf
               </button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5 text-emerald-600" /> ব্যাকআপ ও রিস্টোর (Backup & Restore)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h4 className="font-bold text-emerald-900">তথ্য ব্যাকআপ রাখুন</h4>
+                <p className="text-xs text-emerald-700 mt-1">আপনার সকল তথ্য একটি ফাইল হিসেবে ডাউনলোড করে রাখুন। ফোন হারিয়ে গেলে বা ব্রাউজার ডাটা ক্লিয়ার হলে এটি কাজে লাগবে।</p>
+              </div>
+              <button
+                onClick={handleBackup}
+                className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all font-bold shrink-0"
+              >
+                <Download className="h-5 w-5" />
+                ব্যাকআপ ডাউনলোড
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h4 className="font-bold text-slate-900">ব্যাকআপ রিস্টোর করুন</h4>
+                <p className="text-xs text-slate-500 mt-1">আগে ডাউনলোড করা ব্যাকআপ ফাইল থেকে তথ্য ফিরিয়ে আনুন।</p>
+              </div>
+              <div className="shrink-0">
+                <input
+                  type="file"
+                  ref={importInputRef}
+                  onChange={handleImport}
+                  accept=".json"
+                  className="hidden"
+                />
+                <button
+                  onClick={() => importInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 px-6 py-3 rounded-xl hover:bg-slate-100 transition-all font-bold"
+                >
+                  <FileJson className="h-5 w-5" />
+                  ফাইল সিলেক্ট করুন
+                </button>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
