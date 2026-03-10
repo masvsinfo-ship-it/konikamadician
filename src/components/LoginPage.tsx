@@ -39,6 +39,7 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   const [recoveredPassword, setRecoveredPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInstallLoading, setIsInstallLoading] = useState(false);
 
   const [isInstalled, setIsInstalled] = useState(false);
 
@@ -62,9 +63,9 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
       }
     } else {
       // If prompt is not ready, show a brief loading state instead of alerts
-      setIsLoading(true);
+      setIsInstallLoading(true);
       setTimeout(() => {
-        setIsLoading(false);
+        setIsInstallLoading(false);
         // Try to check if it's already installed or if we can trigger it now
         if (window.matchMedia('(display-mode: standalone)').matches) {
           setIsInstalled(true);
@@ -369,26 +370,29 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
               <button
-                onClick={isInstalled ? undefined : handleInstall}
-                className={`relative w-full bg-white border border-slate-200 p-5 rounded-[2rem] flex items-center gap-5 transition-all shadow-xl shadow-slate-200/50 ${isInstalled ? 'opacity-75 cursor-default' : 'hover:bg-slate-50'}`}
+                type="button"
+                onClick={isInstalled || isInstallLoading ? undefined : handleInstall}
+                className={`relative w-full bg-white border border-slate-200 p-5 rounded-[2rem] flex items-center gap-5 transition-all shadow-xl shadow-slate-200/50 ${isInstalled || isInstallLoading ? 'opacity-75 cursor-default' : 'hover:bg-slate-50'}`}
               >
-                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform ${isInstalled ? 'bg-slate-400 group-hover:scale-100' : 'bg-emerald-600 shadow-emerald-600/20 group-hover:scale-110'}`}>
-                  <Smartphone className="h-8 w-8" />
+                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform ${isInstalled ? 'bg-slate-400' : isInstallLoading ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-600 shadow-emerald-600/20 group-hover:scale-110'}`}>
+                  {isInstallLoading ? <Loader2 className="h-8 w-8 animate-spin" /> : <Smartphone className="h-8 w-8" />}
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">
-                    {isInstalled ? 'App Installed' : 'Android APK Installer'}
+                    {isInstalled ? 'App Installed' : isInstallLoading ? 'Preparing...' : 'Android APK Installer'}
                   </p>
                   <p className="text-xl font-black text-slate-900 leading-none">
-                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : 'সরাসরি ইন্সটল করুন'}
+                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : isInstallLoading ? 'প্রসেসিং হচ্ছে...' : 'সরাসরি ইন্সটল করুন'}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 mt-1">
-                    {isInstalled ? 'হোম স্ক্রিন থেকে ওপেন করুন' : 'অটোমেটিক এন্ড্রয়েড ইন্সটলেশন'}
+                    {isInstalled ? 'হোম স্ক্রিন থেকে ওপেন করুন' : isInstallLoading ? 'দয়া করে অপেক্ষা করুন' : 'অটোমেটিক এন্ড্রয়েড ইন্সটলেশন'}
                   </p>
                 </div>
                 <div className="ml-auto flex flex-col items-center gap-1">
                   {isInstalled ? (
                     <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                  ) : isInstallLoading ? (
+                    <div className="h-6 w-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
                       <Download className="h-6 w-6 text-emerald-600 animate-bounce" />
