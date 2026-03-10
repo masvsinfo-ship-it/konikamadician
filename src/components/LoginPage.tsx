@@ -63,9 +63,9 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
       const isAndroid = /Android/.test(navigator.userAgent);
       
       if (isIOS) {
-        alert('আইফোনে ইন্সটল করতে:\n১. নিচে "Share" বাটনে ক্লিক করুন\n২. তারপর "Add to Home Screen" সিলেক্ট করুন।');
+        alert('আইফোনে অ্যাপটি ইন্সটল করতে:\n১. নিচে "Share" (শেয়ার) বাটনে ক্লিক করুন\n২. তারপর "Add to Home Screen" (হোম স্ক্রিনে যোগ করুন) সিলেক্ট করুন।');
       } else if (isAndroid) {
-        alert('এন্ড্রয়েডে ইন্সটল করতে:\n১. ব্রাউজারের উপরে ডানদিকের ৩-ডট (⋮) মেনুতে ক্লিক করুন\n২. "Install App" অথবা "Add to Home Screen" সিলেক্ট করুন।');
+        alert('এন্ড্রয়েডে সরাসরি ইন্সটল করতে:\n১. ব্রাউজারের উপরে ডানদিকের ৩-ডট (⋮) মেনুতে ক্লিক করুন\n২. "Install App" (অ্যাপ ইন্সটল করুন) অথবা "Add to Home Screen" সিলেক্ট করুন।\n\nএটি করলে অ্যাপটি আপনার ফোনে সাধারণ অ্যাপের মতো সেভ হয়ে যাবে।');
       } else {
         alert('অ্যাপটি ইন্সটল করতে ব্রাউজারের মেনু থেকে "Install App" বা "Add to Home Screen" অপশনটি ব্যবহার করুন।');
       }
@@ -373,13 +373,13 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">
-                    {isInstalled ? 'App Installed' : 'Android App (PWA)'}
+                    {isInstalled ? 'App Installed' : 'Android App (APK)'}
                   </p>
                   <p className="text-xl font-black text-slate-900 leading-none">
-                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : 'সরাসরি ইন্সটল করুন'}
+                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : 'সরাসরি ডাউনলোড করুন'}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 mt-1">
-                    {isInstalled ? 'আপনার হোম স্ক্রিন থেকে ওপেন করুন' : 'APK ছাড়াই অ্যাপের মতো ব্যবহার করুন'}
+                    {isInstalled ? 'আপনার হোম স্ক্রিন থেকে ওপেন করুন' : 'অটোমেটিক এন্ড্রয়েড ইন্সটলেশন'}
                   </p>
                 </div>
                 <div className="ml-auto flex flex-col items-center gap-1">
