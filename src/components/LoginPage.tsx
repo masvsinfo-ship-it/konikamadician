@@ -44,10 +44,21 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
-      setIsInstalled(true);
-    }
+    const checkInstalled = () => {
+      if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
+        setIsInstalled(true);
+      }
+    };
+    checkInstalled();
+    window.addEventListener('appinstalled', () => setIsInstalled(true));
+    return () => window.removeEventListener('appinstalled', () => setIsInstalled(true));
   }, []);
+
+  useEffect(() => {
+    if (deferredPrompt) {
+      console.log('Deferred prompt is available in LoginPage');
+    }
+  }, [deferredPrompt]);
 
   const handleInstall = async () => {
     if (deferredPrompt) {
@@ -62,16 +73,26 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
         console.error('Install error:', err);
       }
     } else {
-      // If prompt is not ready, show a brief loading state instead of alerts
       setIsInstallLoading(true);
+      
+      // Check if it's already installed
+      if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
+        setTimeout(() => {
+          setIsInstallLoading(false);
+          setIsInstalled(true);
+        }, 1000);
+        return;
+      }
+
+      // If not ready, show a professional system message
       setTimeout(() => {
         setIsInstallLoading(false);
-        // Try to check if it's already installed or if we can trigger it now
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-          setIsInstalled(true);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+        
+        if (isIOS) {
+          alert('সিস্টেম মেসেজ: আইফোনে সরাসরি অ্যাপটি পেতে নিচের "Share" বাটনে ক্লিক করে "Add to Home Screen" সিলেক্ট করুন।');
         } else {
-          // If still not ready, we can't force the browser, but we avoid showing "rules"
-          console.log('Install prompt not yet ready');
+          alert('সিস্টেম মেসেজ: অটোমেটিক ইন্সটল অপশনটি এখনও ব্রাউজার থেকে প্রস্তুত হয়নি।\n\nবিকল্প পদ্ধতি:\n১. ব্রাউজারের উপরে ৩-ডট (⋮) মেনুতে ক্লিক করুন।\n২. "Install App" বা "Add to Home Screen" সিলেক্ট করুন।');
         }
       }, 1500);
     }
@@ -379,10 +400,10 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">
-                    {isInstalled ? 'App Installed' : isInstallLoading ? 'Preparing...' : 'Android APK Installer'}
+                    {isInstalled ? 'App Installed' : isInstallLoading ? 'System Checking...' : 'Android APK Installer'}
                   </p>
                   <p className="text-xl font-black text-slate-900 leading-none">
-                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : isInstallLoading ? 'প্রসেসিং হচ্ছে...' : 'সরাসরি ইন্সটল করুন'}
+                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : isInstallLoading ? 'প্রসেসিং হচ্ছে...' : 'সরাসরি ডাউনলোড করুন'}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 mt-1">
                     {isInstalled ? 'হোম স্ক্রিন থেকে ওপেন করুন' : isInstallLoading ? 'দয়া করে অপেক্ষা করুন' : 'অটোমেটিক এন্ড্রয়েড ইন্সটলেশন'}
@@ -402,6 +423,24 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
                 </div>
               </button>
             </div>
+
+            {!isInstalled && (
+              <button
+                type="button"
+                onClick={() => {
+                  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+                  if (isIOS) {
+                    alert('আইফোনে সরাসরি অ্যাপটি পেতে নিচের "Share" বাটনে ক্লিক করে "Add to Home Screen" সিলেক্ট করুন।');
+                  } else {
+                    alert('অটোমেটিক ইন্সটল না হলে:\n১. ব্রাউজারের উপরে ৩-ডট (⋮) মেনুতে ক্লিক করুন।\n২. "Install App" বা "Add to Home Screen" সিলেক্ট করুন।');
+                  }
+                }}
+                className="w-full mt-2 text-[10px] font-bold text-slate-400 hover:text-emerald-600 transition-colors uppercase tracking-widest flex items-center justify-center gap-2"
+              >
+                <AlertCircle className="h-3 w-3" />
+                ইন্সটল করতে সমস্যা হচ্ছে? এখানে ক্লিক করুন
+              </button>
+            )}
 
             <div className="text-center space-y-4">
               <div className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
