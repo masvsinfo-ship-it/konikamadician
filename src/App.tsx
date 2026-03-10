@@ -16,10 +16,15 @@ import { Bell, X, BookOpen } from 'lucide-react';
 
 // Global to capture prompt if it fires before React mounts
 let capturedPrompt: any = null;
-window.addEventListener('beforeinstallprompt', (e) => {
+const captureHandler = (e: any) => {
   e.preventDefault();
   capturedPrompt = e;
   console.log('PWA Install prompt captured globally');
+};
+window.addEventListener('beforeinstallprompt', captureHandler);
+window.addEventListener('appinstalled', () => {
+  console.log('App was installed');
+  capturedPrompt = null;
 });
 
 export default function App() {
@@ -46,7 +51,11 @@ export default function App() {
       console.log('PWA Install prompt captured in React');
     };
     window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => setDeferredPrompt(null));
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', () => setDeferredPrompt(null));
+    };
   }, []);
 
   const {

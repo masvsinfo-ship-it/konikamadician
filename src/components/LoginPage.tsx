@@ -53,22 +53,26 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
       try {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') setDeferredPrompt(null);
+        if (outcome === 'accepted') {
+          setDeferredPrompt(null);
+          setIsInstalled(true);
+        }
       } catch (err) {
         console.error('Install error:', err);
       }
     } else {
-      // Fallback instructions if prompt is not ready
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      const isAndroid = /Android/.test(navigator.userAgent);
-      
-      if (isIOS) {
-        alert('আইফোনে অ্যাপটি ইন্সটল করতে:\n১. নিচে "Share" (শেয়ার) বাটনে ক্লিক করুন\n২. তারপর "Add to Home Screen" (হোম স্ক্রিনে যোগ করুন) সিলেক্ট করুন।');
-      } else if (isAndroid) {
-        alert('এন্ড্রয়েডে সরাসরি ইন্সটল করতে:\n১. ব্রাউজারের উপরে ডানদিকের ৩-ডট (⋮) মেনুতে ক্লিক করুন\n২. "Install App" (অ্যাপ ইন্সটল করুন) অথবা "Add to Home Screen" সিলেক্ট করুন।\n\nএটি করলে অ্যাপটি আপনার ফোনে সাধারণ অ্যাপের মতো সেভ হয়ে যাবে।');
-      } else {
-        alert('অ্যাপটি ইন্সটল করতে ব্রাউজারের মেনু থেকে "Install App" বা "Add to Home Screen" অপশনটি ব্যবহার করুন।');
-      }
+      // If prompt is not ready, show a brief loading state instead of alerts
+      setIsLoading(true);
+      setTimeout(() => {
+        setIsLoading(false);
+        // Try to check if it's already installed or if we can trigger it now
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+          setIsInstalled(true);
+        } else {
+          // If still not ready, we can't force the browser, but we avoid showing "rules"
+          console.log('Install prompt not yet ready');
+        }
+      }, 1500);
     }
   };
 
@@ -373,13 +377,13 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">
-                    {isInstalled ? 'App Installed' : 'Android App (APK)'}
+                    {isInstalled ? 'App Installed' : 'Android APK Installer'}
                   </p>
                   <p className="text-xl font-black text-slate-900 leading-none">
-                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : 'সরাসরি ডাউনলোড করুন'}
+                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : 'সরাসরি ইন্সটল করুন'}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 mt-1">
-                    {isInstalled ? 'আপনার হোম স্ক্রিন থেকে ওপেন করুন' : 'অটোমেটিক এন্ড্রয়েড ইন্সটলেশন'}
+                    {isInstalled ? 'হোম স্ক্রিন থেকে ওপেন করুন' : 'অটোমেটিক এন্ড্রয়েড ইন্সটলেশন'}
                   </p>
                 </div>
                 <div className="ml-auto flex flex-col items-center gap-1">
