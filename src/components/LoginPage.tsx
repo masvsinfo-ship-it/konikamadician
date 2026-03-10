@@ -104,37 +104,34 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
     setError('');
     setIsLoading(true);
 
-    // Simulate a small delay for better UX
-    setTimeout(() => {
-      try {
-        if (mode === 'recover') {
-          const result = storageService.recoverPassword(loginId, lastTransactionAmount);
-          if (result.success) setRecoveredPassword(result.password!);
-          else setError(result.error || 'পাসওয়ার্ড উদ্ধার করা সম্ভব হয়নি।');
-        } else if (mode === 'register') {
-          const result = storageService.register({
-            loginId,
-            password,
-            profile: { name, shopName, address, mobile: loginId }
-          });
-          if (result.success) {
-            const loginResult = storageService.login(loginId, password);
-            if (loginResult.success) onLogin(loginResult.data, loginId, password, loginResult.profile);
-            else setMode('login');
-          } else {
-            setError(result.error || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে।');
-          }
+    try {
+      if (mode === 'recover') {
+        const result = await storageService.recoverPassword(loginId, lastTransactionAmount);
+        if (result.success) setRecoveredPassword(result.password!);
+        else setError(result.error || 'পাসওয়ার্ড উদ্ধার করা সম্ভব হয়নি।');
+      } else if (mode === 'register') {
+        const result = await storageService.register({
+          loginId,
+          password,
+          profile: { name, shopName, address, mobile: loginId }
+        });
+        if (result.success) {
+          const loginResult = await storageService.login(loginId, password);
+          if (loginResult.success) onLogin(loginResult.data, loginId, password, loginResult.profile);
+          else setMode('login');
         } else {
-          const result = storageService.login(loginId, password);
-          if (result.success) onLogin(result.data, loginId, password, result.profile);
-          else setError(result.error || 'লগইন ব্যর্থ হয়েছে। সঠিক তথ্য দিন।');
+          setError(result.error || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে।');
         }
-      } catch (err: any) {
-        setError('একটি সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।');
-      } finally {
-        setIsLoading(false);
+      } else {
+        const result = await storageService.login(loginId, password);
+        if (result.success) onLogin(result.data, loginId, password, result.profile);
+        else setError(result.error || 'লগইন ব্যর্থ হয়েছে। সঠিক তথ্য দিন।');
       }
-    }, 800);
+    } catch (err: any) {
+      setError('একটি সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

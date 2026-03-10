@@ -1,8 +1,5 @@
-// Storage Service for Client-Side Only Mode
-// This uses localStorage to store all user data and transactions.
-
-const USERS_KEY = 'dokaner_khata_users';
-const CURRENT_USER_KEY = 'dokaner_khata_current_user';
+// Storage Service using MongoDB Backend API
+// This calls the Express server which interacts with MongoDB.
 
 export interface UserProfile {
   name: string;
@@ -19,93 +16,76 @@ export interface UserAccount {
   data: any;
 }
 
+const API_URL = '/api';
+
 export const storageService = {
-  // Get all users from localStorage
-  getUsers: (): Record<string, UserAccount> => {
-    const usersJson = localStorage.getItem(USERS_KEY);
-    return usersJson ? JSON.parse(usersJson) : {};
-  },
-
-  // Save all users to localStorage
-  saveUsers: (users: Record<string, UserAccount>) => {
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  },
-
   // Register a new user
-  register: (account: Omit<UserAccount, 'data'>): { success: boolean; error?: string } => {
-    const users = storageService.getUsers();
-    if (users[account.loginId]) {
-      return { success: false, error: 'এই নাম্বারটি ইতিমধ্যে নিবন্ধিত' };
+  register: async (account: Omit<UserAccount, 'data'>): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(account),
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'সার্ভার সংযোগে সমস্যা' };
     }
-    users[account.loginId] = { ...account, data: {} };
-    storageService.saveUsers(users);
-    return { success: true };
   },
 
   // Login a user
-  login: (loginId: string, password: string): { success: boolean; data?: any; profile?: UserProfile; error?: string } => {
-    const users = storageService.getUsers();
-    const user = users[loginId];
-    if (!user) return { success: false, error: 'ইউজার পাওয়া যায়নি' };
-    if (user.password !== password) return { success: false, error: 'ভুল পাসওয়ার্ড' };
-    
-    return { 
-      success: true, 
-      data: user.data || {}, 
-      profile: user.profile 
-    };
+  login: async (loginId: string, password: string): Promise<{ success: boolean; data?: any; profile?: UserProfile; error?: string }> => {
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId, password }),
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'সার্ভার সংযোগে সমস্যা' };
+    }
   },
 
   // Sync/Save user data
-  syncData: (loginId: string, data: any): { success: boolean; error?: string } => {
-    const users = storageService.getUsers();
-    if (!users[loginId]) return { success: false, error: 'User not found' };
-    users[loginId].data = data;
-    storageService.saveUsers(users);
-    return { success: true };
+  syncData: async (loginId: string, data: any): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch(`${API_URL}/user/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId, data }),
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'সার্ভার সংযোগে সমস্যা' };
+    }
   },
 
   // Update profile
-  updateProfile: (currentLoginId: string, profileData: Partial<UserAccount>): { success: boolean; error?: string } => {
-    const users = storageService.getUsers();
-    const user = users[currentLoginId];
-    if (!user) return { success: false, error: 'User not found' };
-
-    const newLoginId = profileData.loginId || currentLoginId;
-    
-    // If loginId is changing, check if new one is taken
-    if (newLoginId !== currentLoginId && users[newLoginId]) {
-      return { success: false, error: 'নতুন নাম্বারটি ইতিমধ্যে ব্যবহৃত হচ্ছে' };
+  updateProfile: async (currentLoginId: string, profileData: Partial<UserAccount>): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch(`${API_URL}/user/update-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentLoginId, profileData }),
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'সার্ভার সংযোগে সমস্যা' };
     }
-
-    const updatedUser = {
-      ...user,
-      loginId: newLoginId,
-      password: profileData.password || user.password,
-      profile: {
-        ...user.profile,
-        ...(profileData.profile || {})
-      }
-    };
-
-    if (newLoginId !== currentLoginId) {
-      delete users[currentLoginId];
-    }
-    users[newLoginId] = updatedUser;
-    storageService.saveUsers(users);
-    return { success: true };
   },
 
   // Recover password
-  recoverPassword: (loginId: string, lastTransactionAmount: string): { success: boolean; password?: string; error?: string } => {
-    const users = storageService.getUsers();
-    const user = users[loginId];
-    if (!user) return { success: false, error: 'ইউজার পাওয়া যায়নি' };
-    
-    const transactions = user.data.transactions || [];
-    if (transactions.length > 0 && transactions[0].amount.toString() === lastTransactionAmount.toString()) {
-      return { success: true, password: user.password };
+  recoverPassword: async (loginId: string, lastTransactionAmount: string): Promise<{ success: boolean; password?: string; error?: string }> => {
+    try {
+      const response = await fetch(`${API_URL}/auth/recover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId, lastTransactionAmount }),
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'সার্ভার সংযোগে সমস্যা' };
     }
-    return { success: false, error: 'তথ্য মেলেনি' };
   }
 };

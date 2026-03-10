@@ -115,7 +115,7 @@ export default function App() {
 
     const initApp = async () => {
       try {
-        const result = storageService.login(storedLoginId, storedPassword);
+        const result = await storageService.login(storedLoginId, storedPassword);
         if (result.success) {
           setAllData(result.data, storedLoginId, result.profile);
           localStorage.setItem('is_authenticated', 'true');

@@ -115,10 +115,10 @@ export function useStore() {
 
     if (!loginId) return;
 
-    const syncData = () => {
+    const syncData = async () => {
       try {
         // Sync to local storage service
-        storageService.syncData(loginId, { transactions, customers, shortList, expenses, settings });
+        await storageService.syncData(loginId, { transactions, customers, shortList, expenses, settings });
       } catch (error) {
         console.error('Failed to sync data:', error);
       }
