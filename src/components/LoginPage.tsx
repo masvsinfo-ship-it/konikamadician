@@ -63,6 +63,7 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
   const handleInstall = async () => {
     if (deferredPrompt) {
       try {
+        // সরাসরি ইন্সটল ডায়ালগ ওপেন করবে
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
@@ -75,26 +76,26 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
     } else {
       setIsInstallLoading(true);
       
-      // Check if it's already installed
+      // চেক করা হচ্ছে অলরেডি ইন্সটল আছে কি না
       if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
         setTimeout(() => {
           setIsInstallLoading(false);
           setIsInstalled(true);
-        }, 1000);
+        }, 500);
         return;
       }
 
-      // If not ready, show a professional system message
+      // যদি ব্রাউজার অটোমেটিক প্রম্পট না দেয়, তবে সরাসরি ব্রাউজার মেনু ব্যবহারের নির্দেশ
       setTimeout(() => {
         setIsInstallLoading(false);
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
         
         if (isIOS) {
-          alert('সিস্টেম মেসেজ: আইফোনে সরাসরি অ্যাপটি পেতে নিচের "Share" বাটনে ক্লিক করে "Add to Home Screen" সিলেক্ট করুন।');
+          alert('নিচের "Share" বাটনে ক্লিক করে "Add to Home Screen" এ ক্লিক করুন।');
         } else {
-          alert('সিস্টেম মেসেজ: অটোমেটিক ইন্সটল অপশনটি এখনও ব্রাউজার থেকে প্রস্তুত হয়নি।\n\nবিকল্প পদ্ধতি:\n১. ব্রাউজারের উপরে ৩-ডট (⋮) মেনুতে ক্লিক করুন।\n২. "Install App" বা "Add to Home Screen" সিলেক্ট করুন।');
+          alert('আপনার ব্রাউজারের উপরে ৩-ডট (⋮) মেনুতে ক্লিক করে "Install App" সিলেক্ট করুন।');
         }
-      }, 1500);
+      }, 800);
     }
   };
 
@@ -400,13 +401,13 @@ export function LoginPage({ onLogin, deferredPrompt, setDeferredPrompt }: LoginP
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">
-                    {isInstalled ? 'App Installed' : isInstallLoading ? 'System Checking...' : 'Android APK Installer'}
+                    {isInstalled ? 'App Installed' : isInstallLoading ? 'Checking...' : 'Direct App Installer'}
                   </p>
                   <p className="text-xl font-black text-slate-900 leading-none">
-                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : isInstallLoading ? 'প্রসেসিং হচ্ছে...' : 'সরাসরি ডাউনলোড করুন'}
+                    {isInstalled ? 'সফলভাবে ইন্সটল হয়েছে' : isInstallLoading ? 'অপেক্ষা করুন...' : 'এপ ইন্সটল করুন'}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 mt-1">
-                    {isInstalled ? 'হোম স্ক্রিন থেকে ওপেন করুন' : isInstallLoading ? 'দয়া করে অপেক্ষা করুন' : 'অটোমেটিক এন্ড্রয়েড ইন্সটলেশন'}
+                    {isInstalled ? 'হোম স্ক্রিন থেকে ওপেন করুন' : isInstallLoading ? 'প্রসেসিং হচ্ছে' : 'এক ক্লিকেই সরাসরি ইন্সটল'}
                   </p>
                 </div>
                 <div className="ml-auto flex flex-col items-center gap-1">
