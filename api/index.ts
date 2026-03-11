@@ -13,12 +13,19 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://Vercel-Admin-atlas-amethyst-ball:yHn542J8BAjdBhi6@atlas-amethyst-ball.gmy4acu.mongodb.net/?retryWrites=true&w=majority";
+  let MONGODB_URI = process.env.MONGODB1_MONGODB_URI || process.env.MONGODB_URI || "mongodb+srv://Vercel-Admin-atlas-aero-arrow3:547Ts6s5GbTXxRJ5@atlas-aero-arrow3.wgqk8lc.mongodb.net/?retryWrites=true&w=majority";
 
+  // Clean up URI (remove quotes if user accidentally included them in env vars)
+  MONGODB_URI = MONGODB_URI.trim().replace(/^["']|["']$/g, '');
+
+  console.log('Attempting to connect to MongoDB...');
   // Connect to MongoDB
   mongoose.connect(MONGODB_URI)
-    .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .then(() => console.log('Connected to MongoDB successfully'))
+    .catch(err => {
+      console.error('MongoDB connection error:', err);
+      console.error('URI being used (masked):', MONGODB_URI.substring(0, 15) + '...');
+    });
 
   // Define User Schema
   const userSchema = new mongoose.Schema({
