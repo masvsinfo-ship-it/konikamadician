@@ -31,52 +31,62 @@ export function useStore() {
       return;
     }
 
-    const tx = localStorage.getItem(`transactions_${loginId}`);
-    const cust = localStorage.getItem(`customers_${loginId}`);
-    const short = localStorage.getItem(`shortList_${loginId}`);
-    const exp = localStorage.getItem(`expenses_${loginId}`);
-    const sett = localStorage.getItem(`settings_${loginId}`);
-    const prof = localStorage.getItem(`user_profile_${loginId}`);
+    try {
+      const tx = localStorage.getItem(`transactions_${loginId}`);
+      const cust = localStorage.getItem(`customers_${loginId}`);
+      const short = localStorage.getItem(`shortList_${loginId}`);
+      const exp = localStorage.getItem(`expenses_${loginId}`);
+      const sett = localStorage.getItem(`settings_${loginId}`);
+      const prof = localStorage.getItem(`user_profile_${loginId}`);
 
-    if (tx) setTransactions(JSON.parse(tx));
-    if (cust) setCustomers(JSON.parse(cust));
-    if (short) setShortList(JSON.parse(short));
-    if (exp) setExpenses(JSON.parse(exp));
-    if (sett) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(sett) });
-    if (prof) setUserProfile(JSON.parse(prof));
+      if (tx) setTransactions(JSON.parse(tx));
+      if (cust) setCustomers(JSON.parse(cust));
+      if (short) setShortList(JSON.parse(short));
+      if (exp) setExpenses(JSON.parse(exp));
+      if (sett) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(sett) });
+      if (prof) setUserProfile(JSON.parse(prof));
+    } catch (e) {
+      console.error("Error loading data from storage", e);
+    }
     
     setIsInitialized(true);
   }, [loginId]);
+
+  // Debounced persistence to localStorage
+  useEffect(() => {
+    if (!isInitialized || !loginId) return;
+    
+    const persistData = () => {
+      try {
+        localStorage.setItem(`transactions_${loginId}`, JSON.stringify(transactions));
+        localStorage.setItem(`customers_${loginId}`, JSON.stringify(customers));
+        localStorage.setItem(`shortList_${loginId}`, JSON.stringify(shortList));
+        localStorage.setItem(`expenses_${loginId}`, JSON.stringify(expenses));
+        localStorage.setItem(`settings_${loginId}`, JSON.stringify(settings));
+        if (userProfile) localStorage.setItem(`user_profile_${loginId}`, JSON.stringify(userProfile));
+        
+        // Also update the main users array in storageService (optional but keeps it in sync)
+        storageService.syncData(loginId, { transactions, customers, shortList, expenses, settings });
+      } catch (e) {
+        console.error("Failed to persist data", e);
+      }
+    };
+
+    const timeoutId = setTimeout(persistData, 2000); // Wait 2 seconds of inactivity before saving
+    return () => clearTimeout(timeoutId);
+  }, [transactions, customers, shortList, expenses, settings, isInitialized, loginId, userProfile]);
 
   const setAllData = (data: any, id: string, profile?: UserProfile) => {
     setLoginId(id);
     localStorage.setItem('loginId', id);
     
-    if (data.transactions) {
-      setTransactions(data.transactions);
-      localStorage.setItem(`transactions_${id}`, JSON.stringify(data.transactions));
-    }
-    if (data.customers) {
-      setCustomers(data.customers);
-      localStorage.setItem(`customers_${id}`, JSON.stringify(data.customers));
-    }
-    if (data.shortList) {
-      setShortList(data.shortList);
-      localStorage.setItem(`shortList_${id}`, JSON.stringify(data.shortList));
-    }
-    if (data.expenses) {
-      setExpenses(data.expenses);
-      localStorage.setItem(`expenses_${id}`, JSON.stringify(data.expenses));
-    }
-    if (data.settings) {
-      const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
-      setSettings(newSettings);
-      localStorage.setItem(`settings_${id}`, JSON.stringify(newSettings));
-    }
-    if (profile) {
-      setUserProfile(profile);
-      localStorage.setItem(`user_profile_${id}`, JSON.stringify(profile));
-    }
+    if (data.transactions) setTransactions(data.transactions);
+    if (data.customers) setCustomers(data.customers);
+    if (data.shortList) setShortList(data.shortList);
+    if (data.expenses) setExpenses(data.expenses);
+    if (data.settings) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+    if (profile) setUserProfile(profile);
+    
     setIsInitialized(true);
   };
 
@@ -102,31 +112,6 @@ export function useStore() {
     setLoginId(null);
     setIsInitialized(false);
   };
-
-  useEffect(() => {
-    if (!isInitialized || !loginId) return;
-    
-    localStorage.setItem(`transactions_${loginId}`, JSON.stringify(transactions));
-    localStorage.setItem(`customers_${loginId}`, JSON.stringify(customers));
-    localStorage.setItem(`shortList_${loginId}`, JSON.stringify(shortList));
-    localStorage.setItem(`expenses_${loginId}`, JSON.stringify(expenses));
-    localStorage.setItem(`settings_${loginId}`, JSON.stringify(settings));
-    if (userProfile) localStorage.setItem(`user_profile_${loginId}`, JSON.stringify(userProfile));
-
-    if (!loginId) return;
-
-    const syncData = async () => {
-      try {
-        // Sync to local storage service
-        await storageService.syncData(loginId, { transactions, customers, shortList, expenses, settings });
-      } catch (error) {
-        console.error('Failed to sync data:', error);
-      }
-    };
-
-    const timer = setTimeout(syncData, 1000);
-    return () => clearTimeout(timer);
-  }, [transactions, customers, shortList, expenses, settings, isInitialized, loginId, userProfile]);
 
   const addTransaction = (transaction: Transaction) => {
     setTransactions(prev => [transaction, ...prev]);
