@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { storageService } from '../services/storageService';
 import { Transaction, Customer, ShortItem, AppSettings, DEFAULT_SETTINGS, Expense, UserProfile } from '../types';
 
@@ -65,18 +65,17 @@ export function useStore() {
         localStorage.setItem(`settings_${loginId}`, JSON.stringify(settings));
         if (userProfile) localStorage.setItem(`user_profile_${loginId}`, JSON.stringify(userProfile));
         
-        // Also update the main users array in storageService (optional but keeps it in sync)
         storageService.syncData(loginId, { transactions, customers, shortList, expenses, settings });
       } catch (e) {
         console.error("Failed to persist data", e);
       }
     };
 
-    const timeoutId = setTimeout(persistData, 2000); // Wait 2 seconds of inactivity before saving
+    const timeoutId = setTimeout(persistData, 1000);
     return () => clearTimeout(timeoutId);
   }, [transactions, customers, shortList, expenses, settings, isInitialized, loginId, userProfile]);
 
-  const setAllData = (data: any, id: string, profile?: UserProfile) => {
+  const setAllData = useCallback((data: any, id: string, profile?: UserProfile) => {
     setLoginId(id);
     localStorage.setItem('loginId', id);
     
@@ -88,9 +87,9 @@ export function useStore() {
     if (profile) setUserProfile(profile);
     
     setIsInitialized(true);
-  };
+  }, []);
 
-  const clearData = () => {
+  const clearData = useCallback(() => {
     if (loginId) {
       localStorage.removeItem(`transactions_${loginId}`);
       localStorage.removeItem(`customers_${loginId}`);
@@ -111,127 +110,126 @@ export function useStore() {
     setUserProfile(null);
     setLoginId(null);
     setIsInitialized(false);
-  };
+  }, [loginId]);
 
-  const addTransaction = (transaction: Transaction) => {
+  const addTransaction = useCallback((transaction: Transaction) => {
     setTransactions(prev => [transaction, ...prev]);
-  };
+  }, []);
 
-  const addTransactions = (newTransactions: Transaction[]) => {
+  const addTransactions = useCallback((newTransactions: Transaction[]) => {
     setTransactions(prev => [...newTransactions, ...prev]);
-  };
+  }, []);
 
-  const addCustomer = (customer: Customer) => {
+  const addCustomer = useCallback((customer: Customer) => {
     setCustomers(prev => [...prev, customer]);
-  };
+  }, []);
 
-  const editCustomer = (id: string, updates: Partial<Customer>) => {
+  const editCustomer = useCallback((id: string, updates: Partial<Customer>) => {
     setCustomers(prev => prev.map(c => 
       c.id === id ? { ...c, ...updates } : c
     ));
-  };
+  }, []);
 
-  const updateCustomerDue = (id: string, amount: number) => {
+  const updateCustomerDue = useCallback((id: string, amount: number) => {
     setCustomers(prev => prev.map(c => 
       c.id === id ? { ...c, totalDue: Number((Number(c.totalDue) + Number(amount)).toFixed(2)) } : c
     ));
-  };
+  }, []);
 
-  const deleteTransaction = (id: string) => {
-    const tx = transactions.find(t => t.id === id);
-    if (tx && tx.customerId) {
-      let adjustment = 0;
-      if (tx.type === 'MEDICINE') {
-        // Only adjust due if it was a due sale (not cash sale)
-        if (!tx.description.includes('(নগদ)')) {
-          adjustment = -tx.amount; // Removing a debit reduces due
+  const deleteTransaction = useCallback((id: string) => {
+    setTransactions(prev => {
+      const tx = prev.find(t => t.id === id);
+      if (tx && tx.customerId) {
+        let adjustment = 0;
+        if (tx.type === 'MEDICINE') {
+          if (!tx.description.includes('(নগদ)')) adjustment = -tx.amount;
+        } else if (tx.type === 'DUE_PAYMENT' || tx.type === 'SALE_PAYMENT') {
+          adjustment = tx.amount;
         }
-      } else if (tx.type === 'DUE_PAYMENT' || tx.type === 'SALE_PAYMENT') {
-        adjustment = tx.amount; // Removing a credit increases due
+        
+        if (adjustment !== 0) {
+          setCustomers(cPrev => cPrev.map(c => 
+            c.id === tx.customerId ? { ...c, totalDue: Number((Number(c.totalDue) + Number(adjustment)).toFixed(2)) } : c
+          ));
+        }
       }
-      
-      if (adjustment !== 0) {
-        setCustomers(prev => prev.map(c => 
-          c.id === tx.customerId ? { ...c, totalDue: Number((Number(c.totalDue) + Number(adjustment)).toFixed(2)) } : c
-        ));
-      }
-    }
-    setTransactions(prev => prev.filter(t => t.id !== id));
-  };
+      return prev.filter(t => t.id !== id);
+    });
+  }, []);
 
-  const editTransaction = (id: string, updates: Partial<Transaction>) => {
-    const tx = transactions.find(t => t.id === id);
-    if (!tx) return;
+  const editTransaction = useCallback((id: string, updates: Partial<Transaction>) => {
+    setTransactions(prev => {
+      const tx = prev.find(t => t.id === id);
+      if (!tx) return prev;
 
-    if (tx.customerId && (updates.amount !== undefined || updates.type !== undefined || updates.description !== undefined)) {
-      const oldAmount = tx.amount;
-      const newAmount = updates.amount !== undefined ? updates.amount : oldAmount;
-      const oldType = tx.type;
-      const newType = updates.type !== undefined ? updates.type : oldType;
-      const oldDesc = tx.description;
-      const newDesc = updates.description !== undefined ? updates.description : oldDesc;
-      
-      let oldEffect = 0;
-      if (oldType === 'MEDICINE') {
-        if (!oldDesc.includes('(নগদ)')) oldEffect = oldAmount;
-      } else if (oldType === 'DUE_PAYMENT' || oldType === 'SALE_PAYMENT') {
-        oldEffect = -oldAmount;
+      if (tx.customerId && (updates.amount !== undefined || updates.type !== undefined || updates.description !== undefined)) {
+        const oldAmount = tx.amount;
+        const newAmount = updates.amount !== undefined ? updates.amount : oldAmount;
+        const oldType = tx.type;
+        const newType = updates.type !== undefined ? updates.type : oldType;
+        const oldDesc = tx.description;
+        const newDesc = updates.description !== undefined ? updates.description : oldDesc;
+        
+        let oldEffect = 0;
+        if (oldType === 'MEDICINE') {
+          if (!oldDesc.includes('(নগদ)')) oldEffect = oldAmount;
+        } else if (oldType === 'DUE_PAYMENT' || oldType === 'SALE_PAYMENT') {
+          oldEffect = -oldAmount;
+        }
+        
+        let newEffect = 0;
+        if (newType === 'MEDICINE') {
+          if (!newDesc.includes('(নগদ)')) newEffect = newAmount;
+        } else if (newType === 'DUE_PAYMENT' || newType === 'SALE_PAYMENT') {
+          newEffect = -newAmount;
+        }
+        
+        const adjustment = newEffect - oldEffect;
+        
+        if (adjustment !== 0) {
+          setCustomers(cPrev => cPrev.map(c => 
+            c.id === tx.customerId ? { ...c, totalDue: Number((Number(c.totalDue) + Number(adjustment)).toFixed(2)) } : c
+          ));
+        }
       }
-      
-      let newEffect = 0;
-      if (newType === 'MEDICINE') {
-        if (!newDesc.includes('(নগদ)')) newEffect = newAmount;
-      } else if (newType === 'DUE_PAYMENT' || newType === 'SALE_PAYMENT') {
-        newEffect = -newAmount;
-      }
-      
-      const adjustment = newEffect - oldEffect;
-      
-      if (adjustment !== 0) {
-        setCustomers(prev => prev.map(c => 
-          c.id === tx.customerId ? { ...c, totalDue: Number((Number(c.totalDue) + Number(adjustment)).toFixed(2)) } : c
-        ));
-      }
-    }
 
-    setTransactions(prev => prev.map(t => 
-      t.id === id ? { ...t, ...updates } : t
-    ));
-  };
+      return prev.map(t => t.id === id ? { ...t, ...updates } : t);
+    });
+  }, []);
 
-  const addShortItem = (item: ShortItem) => {
+  const addShortItem = useCallback((item: ShortItem) => {
     setShortList(prev => [item, ...prev]);
-  };
+  }, []);
 
-  const toggleShortItem = (id: string) => {
+  const toggleShortItem = useCallback((id: string) => {
     setShortList(prev => prev.map(item => 
       item.id === id ? { ...item, status: item.status === 'PENDING' ? 'DONE' : 'PENDING' } : item
     ));
-  };
+  }, []);
 
-  const deleteShortItem = (id: string) => {
+  const deleteShortItem = useCallback((id: string) => {
     setShortList(prev => prev.filter(item => item.id !== id));
-  };
+  }, []);
 
-  const addExpense = (expense: Expense) => {
+  const addExpense = useCallback((expense: Expense) => {
     setExpenses(prev => [expense, ...prev]);
-  };
+  }, []);
 
-  const editExpense = (id: string, updates: Partial<Expense>) => {
+  const editExpense = useCallback((id: string, updates: Partial<Expense>) => {
     setExpenses(prev => prev.map(e => 
       e.id === id ? { ...e, ...updates } : e
     ));
-  };
+  }, []);
 
-  const deleteExpense = (id: string) => {
+  const deleteExpense = useCallback((id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
-  };
+  }, []);
 
-  const deleteCustomer = (id: string) => {
+  const deleteCustomer = useCallback((id: string) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
-  };
+  }, []);
 
-  const resetAllData = () => {
+  const resetAllData = useCallback(() => {
     if (confirm('আপনি কি নিশ্চিত যে আপনি সকল তথ্য মুছে ফেলতে চান? এটি আর ফিরিয়ে আনা যাবে না।')) {
       setTransactions([]);
       setCustomers([]);
@@ -239,7 +237,7 @@ export function useStore() {
       setExpenses([]);
       alert('সকল তথ্য সফলভাবে মুছে ফেলা হয়েছে।');
     }
-  };
+  }, []);
 
   return {
     transactions,
