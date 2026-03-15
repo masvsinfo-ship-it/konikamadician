@@ -17,6 +17,7 @@ export interface UserAccount {
 }
 
 const STORAGE_KEY = 'baki_khata_users';
+const API_URL = '/api';
 
 const getUsers = (): UserAccount[] => {
   const data = localStorage.getItem(STORAGE_KEY);
@@ -51,6 +52,14 @@ export const storageService = {
       
       users.push(newUser);
       saveUsers(users);
+
+      // Initial sync to Vercel Blob
+      await fetch(`${API_URL}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId: account.loginId, data: newUser.data }),
+      });
+
       return { success: true };
     } catch (error) {
       return { success: false, error: 'স্টোরেজ ত্রুটি' };
@@ -61,8 +70,25 @@ export const storageService = {
   login: async (loginId: string, password: string): Promise<{ success: boolean; data?: any; profile?: UserProfile; error?: string }> => {
     try {
       const users = getUsers();
-      const user = users.find(u => u.loginId === loginId);
+      let user = users.find(u => u.loginId === loginId);
       
+      // Try to load from Vercel Blob if not in local storage or to sync
+      try {
+        const response = await fetch(`${API_URL}/load/${loginId}`);
+        const result = await response.json();
+        if (result.success && result.data) {
+          if (user) {
+            user.data = result.data;
+          } else {
+            // If user exists in blob but not local, we might need more info (password/profile)
+            // For now, we assume local storage has the account info or we handle it
+            // In a real app, you'd store the whole account object in the blob
+          }
+        }
+      } catch (e) {
+        console.warn('Cloud load failed, using local data');
+      }
+
       if (!user) return { success: false, error: 'ইউজার পাওয়া যায়নি' };
       if (user.password !== password) return { success: false, error: 'ভুল পাসওয়ার্ড' };
       
@@ -79,13 +105,21 @@ export const storageService = {
   // Sync/Save user data
   syncData: async (loginId: string, data: any): Promise<{ success: boolean; error?: string }> => {
     try {
+      // 1. Save to Local Storage (Instant)
       const users = getUsers();
       const index = users.findIndex(u => u.loginId === loginId);
+      if (index !== -1) {
+        users[index].data = data;
+        saveUsers(users);
+      }
       
-      if (index === -1) return { success: false, error: 'User not found' };
-      
-      users[index].data = data;
-      saveUsers(users);
+      // 2. Sync to Vercel Blob (Background)
+      fetch(`${API_URL}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId, data }),
+      }).catch(err => console.error('Cloud sync failed:', err));
+
       return { success: true };
     } catch (error) {
       return { success: false, error: 'সেভ করতে সমস্যা হয়েছে' };
